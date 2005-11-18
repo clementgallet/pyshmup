@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import random
 import logging
 import re
@@ -9,7 +11,7 @@ console.setLevel( logging.DEBUG )
 formatter = logging.Formatter( '%(name)-12s: %(levelname)-8s %(message)s' )
 console.setFormatter( formatter )
 
-logging.getLogger( "bulletml" ).addHandler( console )
+logging.getLogger('').addHandler( console )
 l = logging.getLogger( "bulletml" )
 
 #principe :
@@ -19,17 +21,21 @@ l = logging.getLogger( "bulletml" )
 #  on "instancie" ensuite les objets effectivement utilisés par un appel à la Factory correspondante (avec son label)
 
 
-f = open( "bee.xml", "r" )
-
-tobuild_stack = []
-children_stack = []
-
-known_elements = [ "action", "changeSpeed", "speed" , "term", 
-          "changeDirection", "direction", "repeat", "fire", "wait", "bullet" ]
 
 
-def get_bullet(filename):
-	pass
+
+# FIXME: *gasp*
+class NullAction:
+	def run( self ):
+		pass
+
+# namespaces[namespace]['action'|'fire'|'bullet'][label] = <controller_object>
+namespaces = { "null" : { 'action' : {}, 'fire' : {}, 'bullet' : {} } }
+
+main_actions = { "null" : NullAction() }
+
+#######################
+## Controller objects
 
 class BulletML:
 	type=''
@@ -50,12 +56,10 @@ class Action:
 	def run(self, game_object_control, params = []):
 		for child in self.subactions:
 			child.run( game_object_control, params )
-			if game_object_control.turn_status == END_TURN:
+			if game_object_control.turn_status == WAIT:
 				break
+			game_object_control.turn_status = GO_ON
 			
-# should implement a generic interface to subactions
-#   something like .update()
-
 class Fire:
 	label=''
 	direction=None
@@ -144,28 +148,6 @@ class Repeat:
 	times=0
 	action=0
 
-class Direction:
-	type=0
-	value=0
-
-class Speed:
-	type=0
-	value=0
-
-class Horizontal:
-	type=0
-	value=0
-
-class Vertical:
-	type=0
-	value=0
-
-class Term:
-	value=0
-
-class Times:
-	value=0
-
 # when .run()ed, objects are passed a reference to the foe, bullet, etc..
 
 # Refs should store an instantiated object after the first call
@@ -190,15 +172,16 @@ class FireRef:
 	label=''
 	fire_params=[]
 
-class Null:
-	def run( self ):
-		pass
 
-class Param:
-	"""Params are replaced by Values placed in actionRef, bulletRef, and fireRef.
-	"""
 
-HEUR_VALID_FORMULA = re.compile(r'^([0-9]|\$(rand|rank|[0-9])|\+|-)*\$')
+
+
+
+
+###########
+## Values
+
+HEUR_VALID_FORMULA = re.compile(r'^([0-9.]|\$(rand|rank|[0-9])|\+|-)*$')
 
 filter_definitions = [
   ( re.compile(r'\$rand'), '(random.random())' ),
@@ -228,9 +211,8 @@ class Value:
 	def __init__(self, formula):
 		formula.replace( '\n', '' )
 		if not HEUR_VALID_FORMULA.match(formula):
-			logging.error( 'Invalid formula : ' + formula )
+			l.error( 'Invalid formula : ' + formula )
 			formula='0'
-		self.params = params
 		old_formula = ''
 		while formula != old_formula:
 			old_formula = formula
@@ -247,6 +229,8 @@ class Value:
 		return eval(self.formula)
 		
 
+def get_fire( namespace, label ):
+	return namespaces[namespace]['fire'][label]
 
 
 
@@ -254,64 +238,51 @@ class Value:
 
 
 
+#############
+## Builders
+
+main_action = None
+current_namespace = "pie !"
 
 
-
-#def buildTerm( ):
-#  obj = object_stack.pop( )
-#  while obj != "term":
-#     print obj
-# adopt visitor pattern ?
-
-# $visitor calls $child.add_to_$($visitor.TYPE), passing himself as the argument on which to operate
-
-def get_base( name ):
-	return { name : name }
-
-
-
-class Builder:
-	def __init__( self, typename ):
-		self.target = typename + 'Builder'
-
+class Builder(object):
 	def add_to( self, builder ):
-		l.debug( self.target + '.add_to( ' + builder.target + ' )' )
+		# $visitor calls $child.add_to_$($visitor.TYPE), passing himself as the argument on which to operate
+		try:
+			add_method=self.__getattribute__('add_to_' + builder.element_name )
+		except:
+			l.error( "Don't know what to do with %s in %s." % (self.element_name, builder.element_name) )
+			return
+		add_method( builder )
+		
 
 	def add_text( self, text ):
 		if text:
-			l.warning( "ignoring text : " + text )
+			l.debug( "Ignoring text : " + text )
 
 
-def get_builder( name ):
-	builders = { 'bullet' : BulletRef(), # might work like this : when adding
-	  #non params to a BulletRef builder (ie. Bullut childs actually), add it to the Refs'
-	  # target ; create random name at build time if needs be
-	             'action' : ActionRef(),
-					 }
-	# no, pleaso separate Builder from finished object (cf. endElement)
-	return Builder( name )
-	             
+class BulletmlBuilder(Builder):
+	element_name =  "bulletml"
 
 
-class SpeedBuilder( Builder ):
-	formula = ''
-	
-	def add_text(self, text):
-		self.formula += text
+class BulletBuilder(Builder):
+	element_name="bullet"
 
-	def add_to_ChangeSpeed(self, changespeed_builder):
-		changespeed_builder.speed = Value( self.formula )
 
-class DirectionBuilder( Builder ):
-	formula = ''
-	
-	def add_text(self, text):
-		self.formula += text
+class ActionBuilder(Builder):
+	element_name="action"
 
-	def add_to_ChangeSpeed(self, changedirection_builder):
-		changedirection_builder.direction = Value( self.formula )
+
+class FireBuilder(Builder):
+	element_name="fire"
+
+
+class ChangeDirectionBuilder(Builder):
+	element_name="changeDirection"
+
 
 class ChangeSpeedBuilder( Builder ):
+	element_name="changeSpeed"
 	target = ChangeSpeed()
 	
 	def build(self):
@@ -319,19 +290,13 @@ class ChangeSpeedBuilder( Builder ):
 		self.target.speed = self.term
 		return self.target
 
-class TermBuilder( Builder ):
-	formula = ''
-	
-	def add_text(text):
-		self.formula += text
 
-	def add_to_ChangeDirection(self, changedirection_builder):
-		changedirection_builder.term = Value( self.formula )
+class AccelBuilder(Builder):
+	element_name="accel"
 
-	def add_to_ChangeSpeed(self, changespeed_builder):
-		changespeed_builder.term = Value( self.formula )
 
 class WaitBuilder( Builder ):
+	element_name="wait"
 	target = Wait( )
 
 	def build(self):
@@ -339,36 +304,106 @@ class WaitBuilder( Builder ):
 		self.target.term = self.term
 		return self.target
 
+
+class VanishBuilder(Builder):
+	element_name="vanish"
+
+
+class RepeatBuilder(Builder):
+	element_name="repeat"
+
+
+class DirectionBuilder( Builder ):
+	element_name="direction"
+	formula = ''
 	
+	def add_text(self, text):
+		self.formula += text
+
+	def add_to_changeSpeed(self, changedirection_builder):
+		changedirection_builder.direction = Value( self.formula )
+
+
+class SpeedBuilder( Builder ):
+	element_name="speed"
+	formula = ''
+	
+	def add_text(self, text):
+		self.formula += text
+
+	def add_to_changeSpeed(self, changespeed_builder):
+		changespeed_builder.speed = Value( self.formula )
+
+
+class HorizontalBuilder(Builder):
+	element_name="horizontal"
+
+
+class VerticalBuilder(Builder):
+	element_name="vertical"
+
+
+class TermBuilder( Builder ):
+	element_name="term"
+	formula = ''
+	
+	def add_text(self, text):
+		self.formula += text
+
+	def add_to_changeDirection(self, changedirection_builder):
+		changedirection_builder.term = Value( self.formula )
+
+	def add_to_changeSpeed(self, changespeed_builder):
+		changespeed_builder.term = Value( self.formula )
+
+
+class TimesBuilder(Builder):
+	element_name="times"
+
+
+class BulletRefBuilder(Builder):
+	element_name="bulletRef"
+
+
+class ActionRefBuilder(Builder):
+	element_name="actionRef"
+
+
+class FireRefBuilder(Builder):
+	element_name="fireRef"
+
+
+class ParamBuilder(Builder):
+	element_name="param"
+
+builders = { 
+					 'bulletml' : BulletmlBuilder(),
+					 'bullet' : BulletBuilder(),
+					 'action' : ActionBuilder(),
+					 'fire' : FireBuilder(),
+					 'changeDirection' : ChangeDirectionBuilder(),
+					 'changeSpeed' : ChangeSpeedBuilder(),
+					 'accel' : AccelBuilder(),
+					 'wait' : WaitBuilder(),
+					 'vanish' : VanishBuilder(),
+					 'repeat' : RepeatBuilder(),
+					 'direction' : DirectionBuilder(),
+					 'speed' : SpeedBuilder(),
+					 'horizontal' : HorizontalBuilder(),
+					 'vertical' : VerticalBuilder(),
+					 'term' : TermBuilder(),
+					 'times' : TimesBuilder(),
+					 'bulletRef' : BulletRefBuilder(),
+					 'actionRef' : ActionRefBuilder(),
+					 'fireRef' : FireRefBuilder(),
+					 'param' : ParamBuilder(),
+					 }
 
 
 
-# warning: this is so wrong
-#  finding a safe path to obtain this state is left as an exercice
-#  to the dumber readers
 
-#        |            |    |             |
-#        |            |    | <direction> |
-#        |            |    |             |
-#        |            |    |   <speed>   |
-#        |            |    |             |
-#        |            |    |   "fire"    |
-#        |            |    |             |
-#        |   "fire"   |    |   <action>  |
-#        |            |    |             |
-#        | "bulletml" |    |  "bulletml" |
-#        \____________/    \_____________/
-#
-#         tobuild_stack     children stack
-
-# in chilren stack : objects appearing before the first mark are the 
-# current object's chidren. construction of current object must return
-# after removing that mark
-
-
-
-
-
+#########################
+## Parsing and Building
 
 current_object_stack = []
 
@@ -379,15 +414,23 @@ class BulletMLParser( xml.sax.handler.ContentHandler ):
 			current_object.add_text( chars.strip() )
 
 	def startDocument( self ):
-		print "Document begins"
+		global main_action
+		main_action = None
+
+		namespaces[current_namespace] = {}
 
 	def endDocument( self ):
-		print "Document ends"
+		global main_action
+		if not main_action:
+			main_action = NullAction()
+			l.warning( "No main action found in " + current_namespace )
+		main_actions[current_namespace] = main_action
+		print main_actions
+		main_action = None
 
 	def startElement( self, name, attrs ):
-#		print "start " + name
-		if name in known_elements:
-			builder = get_builder( name )
+		if name in builders:
+			builder = copy.copy( builders[name] )
 			current_object_stack.append( builder )
 		
 		else:
@@ -397,34 +440,45 @@ class BulletMLParser( xml.sax.handler.ContentHandler ):
 		print name, qname, attrs
 
 	def endElement( self, name ):
-		# call an object builder (composition) that will pop the stack until finding its mark
-		# adding popped stuff to the object in the meantime
-#		print "end " + name
-		if name in known_elements:
+		if name in builders:
 			try:
 				builder = current_object_stack.pop()
 				if current_object_stack:
 					parent_builder = current_object_stack[-1]
 					builder.add_to( parent_builder )
 			except:
-				l.error( "Don't know what to do with " + name + " element." )
-#				raise
+				raise
 
 #FIXME: find a slightly less moronic name
 myBulletMLParser = BulletMLParser()
 
+def set_action_namespace( name ):
+	global current_namespace
+	current_namespace = name
+
 def get_main_action( name ):
-	#FIXME: error handling anyone ?
-	if not name in behaviors:
+	if not name in main_actions:
 		set_action_namespace( name )
-		f = open( name, 'r' )
-		xml.sax.parse( f, myBulletMLParser )
-		f.close()
-		# actions have been registered
-		behaviors[name] = 
+		try:
+			f = open( name, 'r' )
+			xml.sax.parse( f, myBulletMLParser )
+			f.close()
+		except Exception,ex:
+			l.error( "Error while parsing BulletML file : " + name )
+			return main_actions["null"]
+	return main_actions[name]
 		
 class GameObjectController:
 	game_object = None
 	
 	def set_behavior( self, name ): # name is really a namepace
 		self.master_action = get_main_action( name )
+
+
+############
+## Testing
+
+if __name__ == '__main__':
+	ctrl = GameObjectController()
+
+	ctrl.set_behavior( 'bee.xml' )
