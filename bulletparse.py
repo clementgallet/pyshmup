@@ -6,6 +6,9 @@ import re
 import xml.sax, xml.sax.handler
 import copy
 
+############
+## Logging
+
 console = logging.StreamHandler( )
 console.setLevel( logging.DEBUG )
 formatter = logging.Formatter( '%(name)-12s: %(levelname)-8s %(message)s' )
@@ -13,6 +16,7 @@ console.setFormatter( formatter )
 
 logging.getLogger('').addHandler( console )
 l = logging.getLogger( "bulletml" )
+l.setLevel( logging.DEBUG )
 
 #principe :
 
@@ -37,6 +41,24 @@ main_actions = { "null" : NullAction() }
 #######################
 ## Controller objects
 
+# run() status codes
+BREAK = 0 # returned by Wait
+CONTINUE = 1 # action is not yet finished
+DONE = 2
+# those are cummunicated via game_object_control.turn_status
+
+class Control:
+	def run_first(self, game_object_control, params=[]):
+		pass
+
+	def run_not_first(self, game_object_control, params=[]):
+		l.error( str(type(self)) + " does not implement .run()" ) # actually run_not_first, but makes more sense to outside reader ?
+	
+	def run(self, game_object_control, params=[]):
+		self.run_first(self, game_object_control, params)
+		self.run = self.run_not_first
+		self.run(game_object_control, params)
+
 class BulletML:
 	type=''
 	contents=[]
@@ -54,11 +76,17 @@ class Action:
 	subactions=[]
 
 	def run(self, game_object_control, params = []):
+		is_done = True # -> False if a subaction is not finished
 		for child in self.subactions:
 			child.run( game_object_control, params )
-			if game_object_control.turn_status == WAIT:
+			if game_object_control.turn_status == CONTINUE:
+				is_done = False
+			elif game_object_control.turn_status == WAIT:
+				is_done = False
 				break
-			game_object_control.turn_status = GO_ON
+		if is_done:
+			game_object_control.turn_status = DONE
+		game_object_control.turn_status = CONTINUE
 			
 class Fire:
 	label=''
@@ -66,48 +94,44 @@ class Fire:
 	speed=None
 	bullets=0 # bulletRefs
 
-class ChangeDirection:
+class ChangeDirection(Control):
 	# has two values :
 	#  term and direction
 
-	def run(self, game_object_control, params = []):
-		try:
-			self.frame += 1
-			if self.frame > self.term:
-				return
-			else:
-				game_object_control.game_object.set_direction( self.initial_direction + \
-				      (self.frame / self.term) * self.direction_offset )
-				return
-		except: # first run
-			self.initial_direction = game_object_control.get_direction()
-			self.direction_offset = self.direction.get( params ) - self.initial_direction
-			if (self.direction_offset % 360) > 180:
-				self.direction_offset = - self.direction_offset
-			self.frame = 0
-			# FIXME: this code is rather misleading
-			self.term = self.term.get( params )
-			self.run( game_object_control )
+	def run_not_first(self, game_object_control, params = []):
+		if self.frame >= self.term:
+			return DONE
+		self.frame += 1
+		game_object_control.game_object.set_direction( self.initial_direction + \
+				(self.frame / self.term) * self.direction_offset )
+		return CONTINUE
+
+	def run_first(self, game_object_control, params=[]):
+		self.initial_direction = game_object_control.get_direction()
+		self.direction_offset = self.direction_value.get( params ) - self.initial_direction
+		if (self.direction_offset % 360) > 180:
+			self.direction_offset = - self.direction_offset
+		self.frame = 0
+		self.term = self.term_value.get( params )
 
 class ChangeSpeed:
 	# has two values :
 	#  term and speed
 
-	def run(self, game_object_control, params = []):
-		try:
+	def run_not_first(self, game_object_control, params = []):
+		if self.frame >= self.term:
+			game_object_control.turn_status = DONE
+		else:
 			self.frame += 1
-			if self.frame > self.term:
-				return
-			else:
-				game_object_control.game_object.set_speed( self.initial_speed + \
-				      (self.frame / self.term) * self.speed_offset )
-				return
-		except: # first run
-			self.initial_speed = game_object_control.get_direction()
-			self.speed_offset = self.speed.get( params )
-			self.frame = 0
-			self.term = self.term.get( params )
-			self.run( game_object_control )
+			game_object_control.game_object.set_speed( self.initial_speed + \
+		  		(self.frame / self.term) * self.speed_offset )
+			game_object_control.turn_status = CONTINUE
+
+	def run_first(self, game_object_control, params = []):
+		self.initial_speed = game_object_control.get_direction()
+		self.speed_offset = self.speed_value.get( params )
+		self.frame = 0
+		self.term = self.term_value.get( params )
 
 
 # random note : when an action is represented as an actionRef, special
@@ -141,12 +165,41 @@ class Accel:
 class Wait:
 	duration=0
 
+	def run_first(self, game_object_control, params=[]):
+		self.term = self.term_value.get(params)
+		self.frame = 0
+
+	def run_not_first(self, game_object_control, params=[]):
+		if self.frame > self.term:
+			game_object_control.turn_status = DONE
+		else:
+			self.frame += 1
+			game_object_control.turn_status = WAIT
+
 class Vanish:
 	pass
 
+# should repeat : someting,term=n ; wait,term=n ; somethingelse,term=m
+# exec somethingelse at all ?
+#  actually this is a problem for Action.run_not_first
+
 class Repeat:
 	times=0
-	action=0
+	actionref=0
+
+	def run_not_first(self, game_object_control, params):
+		if self.repetition > self.times:
+			game_object_control.turn_status = DONE
+		res = self.action_ref.run(game_object_control, params)
+		if res == DONE:
+			self.repetition += 1
+			if self.repetition != self.times:
+				self.actionref.init()
+
+	def run_first(self, game_object, params):
+		self.times = self.times_value.get( params )
+		self.repetition = 0
+	
 
 # when .run()ed, objects are passed a reference to the foe, bullet, etc..
 
@@ -164,8 +217,19 @@ class BulletRef:
 
 class ActionRef:
 	namespace = ''
-	label=''
-	action_params=[]
+	actionname=''
+	param_values=[]
+
+	def init(self, params=[]):
+		self.actionref = get_action(namespace, actionname)
+		self.params = [val.get(params) for val in self.params_values]
+
+	def run_first(self, game_object_control, params=[]):
+		self.init(params)
+
+	def run_not_first(self, game_object_control, params = []):
+		self.action.run(game_object_control, self.params)
+
 
 class FireRef:
 	namespace = ''
@@ -181,7 +245,7 @@ class FireRef:
 ###########
 ## Values
 
-HEUR_VALID_FORMULA = re.compile(r'^([0-9.]|\$(rand|rank|[0-9])|\+|-)*$')
+HEUR_VALID_FORMULA = re.compile(r'^([0-9.]|\$(rand|rank|[0-9])|\+|-|/|\*)*$')
 
 filter_definitions = [
   ( re.compile(r'\$rand'), '(random.random())' ),
@@ -241,9 +305,20 @@ def get_fire( namespace, label ):
 #############
 ## Builders
 
+# find appropriate name
 main_action = None
 current_namespace = "pie !"
 
+def register_action(ns, name, action):
+	namespaces[ns]['action'][name] = action
+
+def register_fire(ns, name, fire):
+	namespaces[ns]['fire'][name] = fire
+
+def register_bullet(ns, name, bullet):
+	namespaces[ns]['bullet'][name] = bullet
+
+# should I encapsulate all of this in a single object ? is there a point ?
 
 class Builder(object):
 	def add_to( self, builder ):
@@ -258,7 +333,25 @@ class Builder(object):
 
 	def add_text( self, text ):
 		if text:
-			l.debug( "Ignoring text : " + text )
+			l.debug( "Ignoring text : " + text + " in " + self.element_name + "." )
+
+
+class FormulaBuilder(Builder):
+	formula = ''
+	def add_text(self, text):
+		self.formula += text
+
+class SubActionBuilder:
+	def add_to_action(self, action_builder):
+		action_builder.target.subactions.append(self.target)
+
+class RefBuilder:
+	def __init__(self): # FIXME: overloading __init__ while planning 
+	                    # on using multiple inheritance is just asking
+							  # for trouble ; oh well..
+		self.target.namespace = current_namespace
+
+
 
 
 class BulletmlBuilder(Builder):
@@ -267,42 +360,60 @@ class BulletmlBuilder(Builder):
 
 class BulletBuilder(Builder):
 	element_name="bullet"
+	target = Bullet()
+
+	def add_to_bulletml(self, bulletml_builder):
+		global main_action
+		register_bullet(current_namespace, self.label, self.target)
+		if not main_action:
+			main_action = self.target
 
 
 class ActionBuilder(Builder):
 	element_name="action"
+	target = Action()
+
+	def add_to_bulletml(self, bulletml_builder):
+		global main_action
+		register_action(current_namespace, self.label, self.target)
+		if not main_action:
+			main_action = self.target
 
 
 class FireBuilder(Builder):
 	element_name="fire"
+	target = Fire()
+
+	def add_to_bulletml(self, bulletml_builder):
+		global main_action
+		register_fire(current_namespace, self.label, self.target)
+		if not main_action:
+			main_action = self.target
 
 
-class ChangeDirectionBuilder(Builder):
+class ChangeDirectionBuilder(Builder, SubActionBuilder):
 	element_name="changeDirection"
+	target = ChangeDirection
 
 
-class ChangeSpeedBuilder( Builder ):
+class ChangeSpeedBuilder(Builder, SubActionBuilder):
 	element_name="changeSpeed"
 	target = ChangeSpeed()
 	
-	def build(self):
-		self.target.term = self.term
-		self.target.speed = self.term
-		return self.target
-
 
 class AccelBuilder(Builder):
 	element_name="accel"
-
-
-class WaitBuilder( Builder ):
-	element_name="wait"
-	target = Wait( )
+	target = Accel( )
 
 	def build(self):
-		#FIXME: error handling
 		self.target.term = self.term
-		return self.target
+		self.target.horizontal = self.horizontal
+		self.target.vertical = self.vertical
+
+
+class WaitBuilder(Builder, SubActionBuilder):
+	element_name="wait"
+	target = Wait()
 
 
 class VanishBuilder(Builder):
@@ -311,62 +422,67 @@ class VanishBuilder(Builder):
 
 class RepeatBuilder(Builder):
 	element_name="repeat"
+	target = Repeat()
 
 
-class DirectionBuilder( Builder ):
+class DirectionBuilder(FormulaBuilder):
 	element_name="direction"
-	formula = ''
 	
-	def add_text(self, text):
-		self.formula += text
-
-	def add_to_changeSpeed(self, changedirection_builder):
-		changedirection_builder.direction = Value( self.formula )
+	def add_to_changeDirection(self, changedirection_builder):
+		changedirection_builder.direction_value = Value( self.formula )
 
 
-class SpeedBuilder( Builder ):
+class SpeedBuilder(FormulaBuilder):
 	element_name="speed"
-	formula = ''
-	
-	def add_text(self, text):
-		self.formula += text
 
 	def add_to_changeSpeed(self, changespeed_builder):
-		changespeed_builder.speed = Value( self.formula )
+		changespeed_builder.target.speed_value = Value( self.formula )
 
 
-class HorizontalBuilder(Builder):
+class HorizontalBuilder(FormulaBuilder):
 	element_name="horizontal"
 
+	def add_to_accel(self, accel_builder):
+		accel_builder.target.horizontal_value = Value( self.formula )
 
-class VerticalBuilder(Builder):
+
+class VerticalBuilder(FormulaBuilder):
 	element_name="vertical"
 
+	def add_to_accel(self, accel_builder):
+		accel_builder.target.vertical_value = Value( self.formula )
 
-class TermBuilder( Builder ):
+
+class TermBuilder(FormulaBuilder):
 	element_name="term"
-	formula = ''
-	
-	def add_text(self, text):
-		self.formula += text
 
 	def add_to_changeDirection(self, changedirection_builder):
-		changedirection_builder.term = Value( self.formula )
+		changedirection_builder.target.term_value = Value( self.formula )
 
 	def add_to_changeSpeed(self, changespeed_builder):
-		changespeed_builder.term = Value( self.formula )
+		changespeed_builder.target.term_value = Value( self.formula )
+
+	def add_to_accel(self, accel_builder):
+		accel_builder.target.term_value = Value( self.formula )
 
 
-class TimesBuilder(Builder):
+class TimesBuilder(FormulaBuilder):
 	element_name="times"
+
+	def add_to_repeat(self, repeat_builder):
+		repeat_builder.target.times_value = Value(self.formula)
 
 
 class BulletRefBuilder(Builder):
 	element_name="bulletRef"
 
 
-class ActionRefBuilder(Builder):
+class ActionRefBuilder(Builder, RefBuilder):
 	element_name="actionRef"
+	target = ActionRef()
+
+	def add_to_repeat(self, repeat_builder):
+		repeat_builder.target.target = self.target # clumsy
 
 
 class FireRefBuilder(Builder):
@@ -375,6 +491,9 @@ class FireRefBuilder(Builder):
 
 class ParamBuilder(Builder):
 	element_name="param"
+
+	def add_to_actionRef(self, actionref_builder):
+		actionref_builder.target.param_values.append(self.value)
 
 builders = { 
 					 'bulletml' : BulletmlBuilder(),
@@ -417,7 +536,9 @@ class BulletMLParser( xml.sax.handler.ContentHandler ):
 		global main_action
 		main_action = None
 
-		namespaces[current_namespace] = {}
+		namespaces[current_namespace] = { 'action' : {},
+		                                  'fire'   : {},
+													 'bullet' : {} }
 
 	def endDocument( self ):
 		global main_action
@@ -432,7 +553,10 @@ class BulletMLParser( xml.sax.handler.ContentHandler ):
 		if name in builders:
 			builder = copy.copy( builders[name] )
 			current_object_stack.append( builder )
-		
+			try:
+				builder.label = attrs.getValue('label')
+			except:
+				pass
 		else:
 			l.warning( "Unknown element : " + name )
 
@@ -465,6 +589,8 @@ def get_main_action( name ):
 			f.close()
 		except Exception,ex:
 			l.error( "Error while parsing BulletML file : " + name )
+			l.debug(ex)
+			raise
 			return main_actions["null"]
 	return main_actions[name]
 		
