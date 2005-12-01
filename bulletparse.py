@@ -72,7 +72,6 @@ class Bullet:
 # if an action is found in a file, build the action separately and ref it
 
 class Action:
-	label=''
 	subactions=[]
 
 	def run(self, game_object_control, params = []):
@@ -309,19 +308,43 @@ def get_fire( namespace, label ):
 main_action = None
 current_namespace = "pie !"
 
-def register_action(ns, name, action):
-	namespaces[ns]['action'][name] = action
-
 def register_fire(ns, name, fire):
 	namespaces[ns]['fire'][name] = fire
 
 def register_bullet(ns, name, bullet):
 	namespaces[ns]['bullet'][name] = bullet
 
+def get_random_name():
+	return 'RND' + str(random.randint(100000,999999))
+
+target_classes = { 
+					 'bullet'          : Bullet,
+					 'action'          : Action,
+					 'fire'            : Fire,
+					 'changeDirection' : ChangeDirection,
+					 'changeSpeed'     : ChangeSpeed,
+					 'accel'           : Accel,
+					 'wait'            : Wait,
+					 'vanish'          : Vanish,
+					 'repeat'          : Repeat,
+					 'bulletRef'       : BulletRef,
+					 'actionRef'       : ActionRef,
+					 'fireRef'         : FireRef,
+					 }
+
+
 # should I encapsulate all of this in a single object ? is there a point ?
 
 class Builder(object):
+	def __init__(self):
+		# needs to have a new one per object, thus in __init__ and not in class block level
+		try:
+			self.target = target_classes[self.element_name]()
+		except KeyError:
+			pass # do nothing for classes that don't build a .target
+
 	def add_to( self, builder ):
+		self.post_build()
 		# $visitor calls $child.add_to_$($visitor.TYPE), passing himself as the argument on which to operate
 		try:
 			add_method=self.__getattribute__('add_to_' + builder.element_name )
@@ -330,6 +353,8 @@ class Builder(object):
 			return
 		add_method( builder )
 		
+	def post_build(self):
+		pass
 
 	def add_text( self, text ):
 		if text:
@@ -346,7 +371,7 @@ class SubActionBuilder:
 		action_builder.target.subactions.append(self.target)
 
 class RefBuilder:
-	def __init__(self): # FIXME: overloading __init__ while planning 
+	def __init__(self): # FIXME: overloading __init__ while planning
 	                    # on using multiple inheritance is just asking
 							  # for trouble ; oh well..
 		self.target.namespace = current_namespace
@@ -364,23 +389,42 @@ class BulletBuilder(Builder):
 
 	def add_to_bulletml(self, bulletml_builder):
 		global main_action
-		register_bullet(current_namespace, self.label, self.target)
 		if not main_action:
 			main_action = self.target
 
 
 class ActionBuilder(Builder):
 	element_name="action"
-	target = Action()
+
+	def register(self):
+		namespaces[current_namespace]['action'][self.target.label] = self.target
 
 	def add_to_bulletml(self, bulletml_builder):
 		global main_action
-		register_action(current_namespace, self.label, self.target)
 		if not main_action:
 			main_action = self.target
 
+	def add_to_repeat(self, repeat_builder):
+		repeat_builder.target.actionref = self.get_ref()
 
-class FireBuilder(Builder):
+	def get_ref(self):
+		ref = ActionRef()
+		ref.namespace = current_namespace
+		ref.label = self.target.label
+		# params are left untouched
+
+	def post_build(self):
+		try:
+			self.target.label
+		except:
+			label = get_random_name()
+			while namespaces[current_namespace]['action'].has_key(label):
+				label = get_random_name()
+			self.target.label = label
+		self.register()
+
+
+class FireBuilder(Builder, SubActionBuilder):
 	element_name="fire"
 	target = Fire()
 
@@ -393,17 +437,17 @@ class FireBuilder(Builder):
 
 class ChangeDirectionBuilder(Builder, SubActionBuilder):
 	element_name="changeDirection"
-	target = ChangeDirection
+	target = ChangeDirection()
 
 
 class ChangeSpeedBuilder(Builder, SubActionBuilder):
 	element_name="changeSpeed"
 	target = ChangeSpeed()
-	
+
 
 class AccelBuilder(Builder):
 	element_name="accel"
-	target = Accel( )
+	target = Accel()
 
 	def build(self):
 		self.target.term = self.term
@@ -411,16 +455,20 @@ class AccelBuilder(Builder):
 		self.target.vertical = self.vertical
 
 
-class WaitBuilder(Builder, SubActionBuilder):
+class WaitBuilder(FormulaBuilder, SubActionBuilder):
 	element_name="wait"
 	target = Wait()
+
+	def add_to_action(self, action_builder):
+		self.target.term_value = Value(self.formula)
+		SubActionBuilder.add_to_action(self, action_builder) # FIXME: "sort of" ugly
 
 
 class VanishBuilder(Builder):
 	element_name="vanish"
 
 
-class RepeatBuilder(Builder):
+class RepeatBuilder(Builder, SubActionBuilder):
 	element_name="repeat"
 	target = Repeat()
 
@@ -495,31 +543,28 @@ class ParamBuilder(Builder):
 	def add_to_actionRef(self, actionref_builder):
 		actionref_builder.target.param_values.append(self.value)
 
-builders = { 
-					 'bulletml' : BulletmlBuilder(),
-					 'bullet' : BulletBuilder(),
-					 'action' : ActionBuilder(),
-					 'fire' : FireBuilder(),
-					 'changeDirection' : ChangeDirectionBuilder(),
-					 'changeSpeed' : ChangeSpeedBuilder(),
-					 'accel' : AccelBuilder(),
-					 'wait' : WaitBuilder(),
-					 'vanish' : VanishBuilder(),
-					 'repeat' : RepeatBuilder(),
-					 'direction' : DirectionBuilder(),
-					 'speed' : SpeedBuilder(),
-					 'horizontal' : HorizontalBuilder(),
-					 'vertical' : VerticalBuilder(),
-					 'term' : TermBuilder(),
-					 'times' : TimesBuilder(),
-					 'bulletRef' : BulletRefBuilder(),
-					 'actionRef' : ActionRefBuilder(),
-					 'fireRef' : FireRefBuilder(),
-					 'param' : ParamBuilder(),
+builder_classes = { 
+					 'bulletml'        : BulletmlBuilder,
+					 'bullet'          : BulletBuilder,
+					 'action'          : ActionBuilder,
+					 'fire'            : FireBuilder,
+					 'changeDirection' : ChangeDirectionBuilder,
+					 'changeSpeed'     : ChangeSpeedBuilder,
+					 'accel'           : AccelBuilder,
+					 'wait'            : WaitBuilder,
+					 'vanish'          : VanishBuilder,
+					 'repeat'          : RepeatBuilder,
+					 'direction'       : DirectionBuilder,
+					 'speed'           : SpeedBuilder,
+					 'horizontal'      : HorizontalBuilder,
+					 'vertical'        : VerticalBuilder,
+					 'term'            : TermBuilder,
+					 'times'           : TimesBuilder,
+					 'bulletRef'       : BulletRefBuilder,
+					 'actionRef'       : ActionRefBuilder,
+					 'fireRef'         : FireRefBuilder,
+					 'param'           : ParamBuilder,
 					 }
-
-
-
 
 #########################
 ## Parsing and Building
@@ -550,11 +595,11 @@ class BulletMLParser( xml.sax.handler.ContentHandler ):
 		main_action = None
 
 	def startElement( self, name, attrs ):
-		if name in builders:
-			builder = copy.copy( builders[name] )
+		if name in builder_classes:
+			builder = builder_classes[name]()
 			current_object_stack.append( builder )
 			try:
-				builder.label = attrs.getValue('label')
+				builder.target.label = attrs.getValue('label')
 			except:
 				pass
 		else:
@@ -564,7 +609,7 @@ class BulletMLParser( xml.sax.handler.ContentHandler ):
 		print name, qname, attrs
 
 	def endElement( self, name ):
-		if name in builders:
+		if name in builder_classes:
 			try:
 				builder = current_object_stack.pop()
 				if current_object_stack:
@@ -608,3 +653,5 @@ if __name__ == '__main__':
 	ctrl = GameObjectController()
 
 	ctrl.set_behavior( 'bee.xml' )
+
+	print namespaces
