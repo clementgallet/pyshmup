@@ -9,13 +9,14 @@ import copy
 ############
 ## Logging
 
-console = logging.StreamHandler( )
-console.setLevel( logging.DEBUG )
-formatter = logging.Formatter( '%(name)-12s: %(levelname)-8s %(message)s' )
-console.setFormatter( formatter )
+if __name__ == '__main__':
+	console = logging.StreamHandler( )
+	console.setLevel( logging.DEBUG )
+	formatter = logging.Formatter( '%(name)-12s: %(levelname)-8s %(message)s' )
+	console.setFormatter( formatter )
+	logging.getLogger('').addHandler( console )
 
-logging.getLogger('').addHandler( console )
-l = logging.getLogger( "bulletml" )
+l = logging.getLogger('bulletml')
 l.setLevel( logging.DEBUG )
 
 #principe :
@@ -83,9 +84,33 @@ class BulletML:
 	type=''
 	contents=[]
 
-class Bullet:
+class Bullet(Control):
 	def __init__(self):
 		self.subactions = []
+
+	def run_first(self, game_object_control, params=[]):
+		try:
+			game_object_control.game_object.direction = self.direction_value.get(params)
+		except AttributeError:
+			pass
+		try:
+			game_object_control.game_object.speed = self.speed_value.get(params)
+		except AttributeError:
+			pass
+
+	def run_not_first(self, game_object_control, params=[]):
+		is_done = False
+		for child in self.subactions:
+			child.run( game_object_control, params )
+			if game_object_control.turn_status == CONTINUE:
+				is_done = False
+			elif game_object_control.turn_status == WAIT:
+				is_done = False
+				break
+		if is_done:
+			game_object_control.turn_status = DONE
+		else:
+			game_object_control.turn_status = CONTINUE
 
 # if an action is found in a file, build the action separately and ref it
 
@@ -116,8 +141,17 @@ class Fire(Control):
 
 	def run_first(self, game_object_control, params=[]):
 		control = GameObjectController()
-		control.main_actions = [self.bulletref]
-		game_object_control.game_object.fire(control)
+		control.master_actions = [self.bulletref]
+		kwargs = { 'controller' : control }
+		try:
+			kwargs['direction'] = self.direction_value.get(params)
+		except AttributeError:
+			pass
+		try:
+			kwargs['speed'] = self.speed_value.get(params)
+		except AttributeError:
+			pass
+		game_object_control.game_object.fire(**kwargs)
 
 	def run_not_first(self, game_object_control, params=[]):
 		game_object_control.turn_status = DONE
@@ -241,10 +275,17 @@ class Repeat(Control):
 #   what's more, Refs need to keep a namespace identifier. it might be
 #   set to current namespace upon bulding
 
-class BulletRef:
-	namespace = ''
-	label=''
-	bullet_params=[]
+class BulletRef(Control):
+	def __init__(self):
+		self.param_values = []
+
+	def run_first(self, game_object_control, params=[]):
+		self.params = [val.get(params) for val in self.param_values]
+		self.bullet = get_bullet(self.namespace, self.label)
+
+	def run_not_first(self, game_object_control, params=[]):
+		self.bullet.run(game_object_control, self.params)
+	
 
 class ActionRef(Control):
 	def __init__(self):
@@ -257,7 +298,7 @@ class ActionRef(Control):
 	def run_first(self, game_object_control, params=[]):
 		self.reinit(params)
 
-	def run_not_first(self, game_object_control, params = []):
+	def run_not_first(self, game_object_control, params=[]):
 		self.action.run(game_object_control, self.params)
 
 
@@ -536,7 +577,7 @@ class DirectionBuilder(FormulaBuilder):
 		bullet_builder.target.direction_value = Value(self.formula)
 
 	def add_to_fire(self, fire_builder):
-		fire_builder.target.direction = Value(self.formula)
+		fire_builder.target.direction_value = Value(self.formula)
 
 
 class SpeedBuilder(FormulaBuilder):
@@ -722,7 +763,7 @@ def get_main_actions( name ):
 	return [ get_action(name, 'topmove'), get_action(name, 'topshot') ]
 		
 class GameObjectController:
-	game_object = None
+	master_actions=[]
 	
 	def set_behavior( self, name ): # name is really a namepace
 		self.master_actions = get_main_actions(name)
@@ -731,6 +772,9 @@ class GameObjectController:
 		#print self.master_actions
 		for act in self.master_actions:
 			act.run(self)
+
+	def add_control(self, control):
+		self.master_actions.append(control)
 
 
 ############

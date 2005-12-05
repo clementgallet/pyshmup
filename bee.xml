@@ -5,23 +5,31 @@
           xmlns="http://www.asahi-net.or.jp/~cs8k-cyu/bulletml">
 
 <action label="topmove">
+ <changeDirection>
+  <direction type="absolute">90</direction>
+  <term>1</term>
+ </changeDirection>
  <changeSpeed>
-  <speed>0.5</speed>
-  <term>10</term>
+  <speed>3</speed>
+  <term>80</term>
  </changeSpeed>
  <changeDirection>
-  <direction type="absolute">120-$rand*240</direction>
-  <term>1</term>
+  <direction type="absolute">0-$rand*180</direction>
+  <term>30</term>
  </changeDirection>
 </action>
 
 <action label="topshot">
  <repeat> <times>99</times>
  <action>
+<!--  <changeDirection>
+   <direction type="relative">$rand*5</direction>
+	<term>5</term>
+  </changeDirection> -->
   <repeat> <times>2+$rank*6</times>
   <action>
    <fire>
-    <direction>0</direction>
+    <direction>$rand*180</direction>
     <bulletRef label="nrm"/>
    </fire>
    <wait>4</wait>
@@ -33,7 +41,14 @@
 </action>
 
 <bullet label="nrm">
- <speed>0.5</speed>
+ <speed>1</speed>
+ <action>
+  <wait>60</wait>
+  <changeSpeed>
+	<speed>-6</speed>
+	<term>80</term>
+  </changeSpeed>
+ </action>
 </bullet>
 
 </bulletml>
