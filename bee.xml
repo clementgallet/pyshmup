@@ -10,7 +10,7 @@
   <term>1</term>
  </changeDirection>
  <changeSpeed>
-  <speed>3</speed>
+  <speed>1</speed>
   <term>80</term>
  </changeSpeed>
  <changeDirection>
@@ -44,10 +44,10 @@
  <speed>1</speed>
  <action>
   <wait>60</wait>
-  <changeSpeed>
-	<speed>-6</speed>
-	<term>80</term>
-  </changeSpeed>
+<!--  <changeSpeed>
+	<speed>-3</speed>
+	<term>160</term>
+  </changeSpeed> -->
  </action>
 </bullet>
 

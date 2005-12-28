@@ -1,14 +1,45 @@
 # -*- coding: utf-8 -*-
 
-from bulletparse import GameObjectController
+import bulletparse
+from bulletparse import GameObjectMainController
 
-NO_GRAPHICS = True
+NO_GRAPHICS = False
 
 import pygame
 import logging
 import math
 import time
+import random
+import copy
 
+#############
+## Constants
+
+PARTIAL_UPDATE = True
+
+WIDTH = 640
+HEIGHT = 480
+#SHOT_BITMAP = "data/images/shot.png"
+SHOT_BITMAP = "data/images/shot_small.png"
+#FILE = "doud.xml"
+#FILE = "doud_synch.xml"
+#FILE = "doud_directed_rand_smooth.xml"
+#FILE = 'struggle.xml'
+FILE = 'bee.xml'
+#FILE = 'slowdown.xml'
+#FILE = 'beewinder.xml'
+#FILE = 'side_cracker.xml'
+#FILE = 'roll3pos.xml'
+#FILE = 'rollbar.xml'
+#FILE = 'keylie_360.xml'
+OUT_LIMIT = 0.2
+
+SPEED_FACTOR = 1.0/400
+
+RANK = 1
+
+FPS = 60
+MAX_SKIP = 9
 
 ############
 ## Logging
@@ -22,9 +53,9 @@ logging.getLogger('').addHandler( console )
 l = logging.getLogger('main')
 l.setLevel(logging.DEBUG)
 
-
-
 images = {}
+
+bulletparse.RANK = RANK
 
 def get_image(name):
 	if name in images:
@@ -63,7 +94,7 @@ def init_sdl():
 			l.warning("Some SDL modules failed to initialize.")
 
 	global screen
-	screen = pygame.display.set_mode( (320,240), pygame.DOUBLEBUF | pygame.HWSURFACE )
+	screen = pygame.display.set_mode( (WIDTH,HEIGHT), pygame.DOUBLEBUF | pygame.HWSURFACE )
 	pygame.display.set_caption("out of funny title ideas...")
 	
 		
@@ -73,44 +104,57 @@ update_list = []
 
 class SimpleBullet:
 	direction = 0.0
-	speed = 1.0
-	x = 160.0
-	y = 100.0
+	speed = 0.0
+	x = WIDTH / 2.0
+	y = HEIGHT / 2.0
 
 	def __init__(self):
-		self.controller = GameObjectController()
+		self.controller = GameObjectMainController()
 		self.controller.game_object = self
-		self.controller.set_behavior('bee.xml')
+		self.controller.set_behavior(FILE)
 
-		self.image = get_image('data/images/shot.png')
+		self.image = get_image( SHOT_BITMAP )
 		self.rect = self.image.get_rect()
-		self.rect.topleft = (self.x, self.y)
+		self.rect.center = (self.x, self.y)
+		if PARTIAL_UPDATE:
+			self.last_rect = copy.deepcopy(self.rect)
+			self.temp_rect = copy.deepcopy(self.rect)
 
 		update_list.append(self)
 		self.to_remove = False
 
 
-	def fire(self, controller, direction=0, speed=1.0):
-		#print "launching ", bullet_control, " in hyperspace"
+	def fire(self, controller, direction=None, speed=None):
 		new_bullet = SimpleBullet()
 		new_bullet.controller = controller 
-		controller.game_object = new_bullet
+		controller.set_game_object(new_bullet)
 		new_bullet.x = self.x
 		new_bullet.y = self.y
-		new_bullet.direction = direction
-		new_bullet.speed = speed
+		if direction is not None:
+			new_bullet.direction = direction
+		else:
+			new_bullet.direction = self.direction
+		if speed is not None:
+			new_bullet.speed = speed
+		else:
+			new_bullet.speed = self.speed
 
 	def update(self):
-		if self.x < -20 or self.x > 340 or self.y < -20 or self.y > 260:
+		if self.x < -WIDTH*OUT_LIMIT or self.x > WIDTH*(1+OUT_LIMIT) or self.y < -HEIGHT*OUT_LIMIT or self.y > HEIGHT*(1+OUT_LIMIT):
 			self.to_remove = True
 		self.controller.run()
-		self.x += math.cos(self.direction*math.pi/180)*self.speed*0.5
-		self.y -= math.sin(self.direction*math.pi/180)*self.speed*0.5
+		self.x += math.cos(self.direction*math.pi/180)*self.speed*WIDTH*SPEED_FACTOR*3/4
+		self.y -= math.sin(self.direction*math.pi/180)*self.speed*HEIGHT*SPEED_FACTOR
 		self.rect.center = (self.x, self.y)
 
 	def draw(self):
 		screen.blit(self.image, self.rect)
-		pass
+		if PARTIAL_UPDATE:
+			self.last_rect.center = self.temp_rect.center
+			self.temp_rect.center = self.rect.center
+
+	def vanish(self):
+		self.to_remove = True
 		
 		
 
@@ -130,35 +174,70 @@ class Player:
 		self.image = get_image("data/images/ship.png")
 		self.rect = self.image.get_rect()
 		self.rect.center = (self.x, self.y)
+fskip = 0
+def get_turn_actions():
+	global old_ticks
+	global skip_c, fskip
+	new_ticks = pygame.time.get_ticks()
+	next_ticks = old_ticks + 1000/FPS
+	old_ticks = next_ticks
+	if new_ticks <= next_ticks or fskip > MAX_SKIP:
+		pygame.time.wait(next_ticks - new_ticks)
+		fskip = 0
+		return 2
+	else:
+		skip_c += 1
+		fskip += 1
+		return 1
 
-
-
-if __name__ == '__main__':
+skip_c = 0
+def main():
+	global old_ticks
 	init_sdl()
 	x=0
 	first_ticks = pygame.time.get_ticks()
 	frame = 0
+	vframe = 0
+	max_ob = 0
+	old_ticks = pygame.time.get_ticks()
 	SimpleBullet()
-	SimpleBullet()
-	SimpleBullet()
-	SimpleBullet()
-	SimpleBullet()
-	SimpleBullet()
-	SimpleBullet()
-	SimpleBullet()
+#	SimpleBullet()
+#	SimpleBullet()
+#	SimpleBullet()
+#	SimpleBullet()
+#	SimpleBullet()
+#	SimpleBullet()
+#	SimpleBullet()
+	last_rects = []
 	while update_list:
+		turn_actions = get_turn_actions()
+		if len(update_list) > max_ob:
+			max_ob = len(update_list)
 		for bullet in update_list:
 			bullet.update()
-		for bullet in update_list:
-			if bullet.to_remove:
-				update_list.remove(bullet)
-		for bullet in update_list:
-			bullet.draw()
+		for bullet in [bullet for bullet in update_list if bullet.to_remove]:
+			update_list.remove(bullet)
+			if PARTIAL_UPDATE:
+				pygame.display.update(bullet.temp_rect)
+		if turn_actions >= 2:
+			vframe += 1
+			for bullet in update_list:
+				bullet.draw()
+			if PARTIAL_UPDATE:
+				pygame.display.update([b.rect for b in update_list] + [b.last_rect for b in update_list])
+			else:
+				pygame.display.flip()
+			screen.fill( (20,20,20) )
 		frame += 1
 		
 		#pygame.display.update(pygame.Rect(200,200,100,100))
-		pygame.display.flip()
-		screen.fill( (20,20,20) )
 		#time.sleep(.02)
 		#print bullet.x, bullet.y
-	print float(frame)/(pygame.time.get_ticks()-first_ticks)*1000
+	print "Gameplay  fps :", float(frame)/(pygame.time.get_ticks()-first_ticks)*1000
+	print "Graphical fps :", float(vframe)/(pygame.time.get_ticks()-first_ticks)*1000
+	print skip_c, "skips"
+	print "max objects # :", max_ob
+
+
+if __name__ == '__main__':
+	main()

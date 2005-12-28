@@ -6,6 +6,10 @@ import re
 import xml.sax, xml.sax.handler
 import copy
 
+import traceback
+
+RANK = 1.0
+
 ############
 ## Logging
 
@@ -31,13 +35,11 @@ l.setLevel( logging.DEBUG )
 
 # FIXME: *gasp*
 class NullAction:
-	def run(self, game_object_control):
+	def run(self, game_object_control, params=[]):
 		pass
 
 # namespaces[namespace]['action'|'fire'|'bullet'][label] = <controller_object>
-namespaces = { "null" : { 'action' : {}, 'fire' : {}, 'bullet' : {} } }
-
-main_actions = { "null" : NullAction() }
+namespaces = { "null" : { 'action' : {}, 'fire' : {}, 'bullet' : {}, 'main_actions' : [] } }
 
 def get_action(namespace, label):
 	return copy.deepcopy( namespaces[namespace]['action'][label] )
@@ -67,22 +69,29 @@ class Control:
 	# A word about copy.deepcopy : it does not support copying functions,
 	# and so chokes on objects that have dynamically bound methods.
 	# DO NOT TRY TO DEEPCOPY A CONTROL THAT HAS BEEN .RUN()ED !
-	# It is actually cool since it sort of warn us of tampering with 
+	# It is actually cool since it sort of warns us about tampering with 
 	# namespaces[]'s content.
 	def run_first(self, game_object_control, params=[]):
 		pass
 
 	def run_not_first(self, game_object_control, params=[]):
-		l.debug( str(type(self)) + " does not implement .run_not_first()" ) 
-	
+		l.debug( str(self) + " does not implement .run_not_first()" ) 
+
 	def run(self, game_object_control, params=[]):
 		self.run_first(game_object_control, params)
 		self.run = self.run_not_first
 		self.run(game_object_control, params)
-
-class BulletML:
-	type=''
-	contents=[]
+		
+	# We can't really always restart with a "pure" control (ie. from namespaces)
+	# because of the sequence-type speeds and directions. Therefore we need
+	# explicit restarting, sometimes preserving part of the state.
+	# This has a few consequences :
+	#  - run_first should allow multiple calls, or reinit() must be overloaded.
+	#  - the original state should never really be forgotten (namely variables
+	#    set by Builders.
+	def reinit(self, game_object_control, params=[]):
+		self.run_first(game_object_control, params)
+		
 
 class Bullet(Control):
 	def __init__(self):
@@ -90,11 +99,12 @@ class Bullet(Control):
 
 	def run_first(self, game_object_control, params=[]):
 		try:
-			game_object_control.game_object.direction = self.direction_value.get(params)
+			game_object_control.game_object.direction = \
+			   self.direction.get_standard(game_object_control, params)
 		except AttributeError:
 			pass
 		try:
-			game_object_control.game_object.speed = self.speed_value.get(params)
+			game_object_control.game_object.speed = self.speed.get_standard(params)
 		except AttributeError:
 			pass
 
@@ -119,44 +129,133 @@ class Action(Control):
 		self.subactions = []
 
 	def run_not_first(self, game_object_control, params = []):
-		is_done = True # -> False if a subaction is not finished
-		for child in self.subactions:
-			child.run( game_object_control, params )
-			if game_object_control.turn_status == CONTINUE:
-				is_done = False
-			elif game_object_control.turn_status == WAIT:
-				is_done = False
-				break
-		if is_done:
+#		is_done = True # -> False if a subaction is not finished
+#		for child in self.subactions:
+#			child.run( game_object_control, params )
+#			if game_object_control.turn_status == CONTINUE:
+#				is_done = False
+#			elif game_object_control.turn_status == WAIT:
+#				is_done = False
+#				break
+#		if is_done:
+#			game_object_control.turn_status = DONE
+#		else:
+#			game_object_control.turn_status = CONTINUE
+		if self.current_index >= self.sub_length:
 			game_object_control.turn_status = DONE
 		else:
-			game_object_control.turn_status = CONTINUE
-
-	def run_first(self, game_object_control, params=[]):
-		pass
+			self.subactions[self.current_index].run(game_object_control, params)
+			if game_object_control.turn_status == DONE:
+				self.current_index += 1
+			if self.current_index >= self.sub_length:
+				game_object_control.turn_status = DONE
+			else:
+				game_object_control.turn_status = CONTINUE
 			
-class Fire(Control):
-	def __init__(self):
-		self.subactions = []
 
 	def run_first(self, game_object_control, params=[]):
-		control = GameObjectController()
-		control.master_actions = [self.bulletref]
-		kwargs = { 'controller' : control }
-		try:
-			kwargs['direction'] = self.direction_value.get(params)
-		except AttributeError:
-			pass
-		try:
-			kwargs['speed'] = self.speed_value.get(params)
-		except AttributeError:
-			pass
-		game_object_control.game_object.fire(**kwargs)
+		self.current_index = 0
+		self.sub_length = len(self.subactions)
+
+	def reinit(self, game_object_control, params=[]):
+		for child in self.subactions:
+			child.reinit(game_object_control, params)
+		self.current_index = 0
+
+class Fire(Control):
+	def reinit_launch(self, game_object_control, params=[]):
+		"""Builds the argument list for fire()."""
+		control = GameObjectMainController()
+		sub_control = GameObjectSubController()
+#		self.bulletref.reinit(game_object_control, params=[])
+		sub_control.top_action = copy.deepcopy(self.bulletref)
+		control.sub_controllers = [sub_control]
+		self.kwargs = { 'controller' : control }
+	
+
+	def run_first(self, game_object_control, params=[]):
+		self.already_fired = False
+		self.reinit_launch(game_object_control, params)
 
 	def run_not_first(self, game_object_control, params=[]):
+		if not self.already_fired:
+			self.already_fired = True
+
+			main_control = GameObjectMainController()
+			main_control.game_object = game_object_control.game_object
+
+			bullet = self.bulletref.get_bullet()
+
+			for action in bullet.subactions:
+				main_control.add_action(action)
+
+			# arbitrary order of precedence :
+			#  bullet < fire
+			# (if that turns out to be false, swap the lines ;) )
+			# we try get a Speed and Direction from them
+
+			# but wait, there's more !
+			# Fire receives params, and if bulletRef.is_real_ref, bulletRef
+			# has its own too, whose actual values might depend en Fire's
+			# received params. confused yet ?
+
+			# most of this code may be sent to run_first ?
+
+			NOWHERE = 0
+			BULLET = 1
+			FIRE = 2
+
+			speed_location = NOWHERE
+			direction_location = NOWHERE
+
+			try:
+				speed = bullet.speed
+				speed_location = BULLET
+			except: pass
+			try:
+				direction = bullet.direction
+				direction_location = BULLET
+			except: pass
+
+			try:
+				speed = self.speed
+				speed_location = FIRE
+			except: pass
+			try:
+				direction = self.direction
+				direction_location = FIRE
+			except: pass
+
+			self.bulletref.reinit_params(params)
+
+			if speed_location == FIRE:
+				numeric_speed = speed.get_standard(game_object_control, params)
+			elif speed_location == BULLET:
+				numeric_speed = speed.get_standard(game_object_control, self.bulletref.params)
+			else:
+				numeric_speed = game_object_control.game_object.speed
+				
+			if direction_location == FIRE:
+				numeric_direction = direction.get_standard(game_object_control, params)
+			elif direction_location == BULLET:
+				numeric_direction = direction.get_standard(game_object_control, self.bulletref.params)
+			else:
+				numeric_direction = game_object_control.game_object.direction
+
+			if self.bulletref.is_real_ref:
+				main_control.params = self.bulletref.params
+			else:
+				main_control.params = params
+
+			main_control.game_object.fire(main_control, numeric_direction, numeric_speed)
+
+			game_object_control.last_speed = numeric_speed
+			game_object_control.last_direction = numeric_direction
+
 		game_object_control.turn_status = DONE
-		
-		
+			
+	# default reinit
+
 
 class ChangeDirection(Control):
 	# has two values :
@@ -173,7 +272,8 @@ class ChangeDirection(Control):
 
 	def run_first(self, game_object_control, params=[]):
 		self.initial_direction = game_object_control.game_object.direction
-		self.direction_offset = self.direction_value.get( params ) - self.initial_direction
+		self.direction_offset = self.direction.get_standard(game_object_control, params) - \
+		                          self.initial_direction
 		self.direction_offset = self.direction_offset % 360
 		if abs(self.direction_offset) > 180:
 			self.direction_offset -= 360
@@ -189,17 +289,45 @@ class ChangeSpeed(Control):
 			game_object_control.turn_status = DONE
 		else:
 			self.frame += 1
-			game_object_control.game_object.speed = self.initial_speed + \
-		  		(float(self.frame) / self.term) * self.speed_offset
+			game_object_control.game_object.speed = \
+			       self.get_new_speed(game_object_control, params)
 			game_object_control.turn_status = CONTINUE
 
 	def run_first(self, game_object_control, params = []):
-		self.initial_speed = game_object_control.game_object.speed
-		self.speed_offset = self.speed_value.get( params ) - self.initial_speed
+		initial_speed = game_object_control.game_object.speed
 		self.frame = 0
-		self.term = self.term_value.get( params )
+		self.term = int(self.term_value.get( params ))
+		if self.term <= 0:
+			self.term = 1
+			l.error("Invalid term in speed : " + self.speed.formula)
 
+		if self.speed.type == "absolute":
+			self.theoretical_speed = initial_speed
+			self.speed_offset = float( self.speed.get(params) -
+			                       initial_speed ) / self.term
+			self.get_new_speed = self.get_new_speed_absolute
+		elif self.speed.type == "relative":
+			self.theoretical_speed = initial_speed
+			self.speed_offset = float( self.speed.get(params) ) / self.term
+			self.get_new_speed = self.get_new_speed_relative
+		else: # "sequence"
+			self.last_speed = game_object_control.game_object.speed
+			self.get_new_speed = self_get_new_speed_sequence
 
+	def get_new_speed_absolute(self, game_object_control, params=[]):
+		self.theoretical_speed += self.speed_offset
+		return self.theoretical_speed
+
+	def get_new_speed_relative(self, game_object_control, params=[]):
+		self.theoretical_speed += self.speed_offset
+		return self.theoretical_speed
+		
+
+	def get_new_speed_sequence(self, game_object_control, params=[]):
+		# we assume it will be used to fire() (thus fed back)
+		return game_object_control.last_speed + self.get(params)
+
+# FIXME: implement following remark
 # random note : when an action is represented as an actionRef, special
 # precautions should be taken so that the actionRef's params are transfered
 # in contrast, a «real» actionRef shoud not tranfer its given params
@@ -233,7 +361,7 @@ class Wait(Control):
 
 	def run_first(self, game_object_control, params=[]):
 		self.term = self.term_value.get(params)
-		self.frame = 0
+		self.frame = -1
 
 	def run_not_first(self, game_object_control, params=[]):
 		if self.frame > self.term:
@@ -242,8 +370,12 @@ class Wait(Control):
 			self.frame += 1
 			game_object_control.turn_status = WAIT
 
-class Vanish:
-	pass
+class Vanish(Control):
+	def run_first(self, game_object_control, params=[]):
+		game_object_control.game_object.vanish()
+
+	def run_not_first(self, game_object_control, params=[]):
+		game_object_control.turn_status = DONE
 
 # should repeat : someting,term=n ; wait,term=n ; somethingelse,term=m
 # exec somethingelse at all ?
@@ -258,7 +390,7 @@ class Repeat(Control):
 			if game_object_control.turn_status == DONE:
 				self.repetition += 1
 				if self.repetition != self.times:
-					self.actionref.reinit(params)
+					self.actionref.reinit(game_object_control, params)
 			game_object_control.turn_status = CONTINUE
 
 	def run_first(self, game_object, params):
@@ -278,41 +410,71 @@ class Repeat(Control):
 class BulletRef(Control):
 	def __init__(self):
 		self.param_values = []
+		self.is_real_ref = True
+
+	def reinit_params(self, params):
+		self.params = [val.get(params) for val in self.param_values]
+
+	def get_bullet(self):
+		return get_bullet(self.namespace, self.label)
 
 	def run_first(self, game_object_control, params=[]):
-		self.params = [val.get(params) for val in self.param_values]
 		self.bullet = get_bullet(self.namespace, self.label)
+		# Do not .reinit_params() ! Only Fire knew the appropriate params.
 
 	def run_not_first(self, game_object_control, params=[]):
-		self.bullet.run(game_object_control, self.params)
+		# If real ref, has its own params to transmit.
+		if self.is_real_ref:
+			self.bullet.run(game_object_control, self.params)
+		else:
+			self.bullet.run(game_object_control, params)
 	
 
 class ActionRef(Control):
 	def __init__(self):
 		self.param_values = []
+		self.is_real_ref = True
 
-	def reinit(self, params=[]):
+	def reinit(self, game_object_control, params=[]):
+		self.reinit_params(params)
+		self.action.reinit(game_object_control, self.params)
+
+	def reinit_params(self, params):
 		self.params = [val.get(params) for val in self.param_values]
-		self.action = get_action(self.namespace, self.label)
 		
 	def run_first(self, game_object_control, params=[]):
-		self.reinit(params)
+		self.action = get_action(self.namespace, self.label)
+		self.reinit_params(params)
 
 	def run_not_first(self, game_object_control, params=[]):
-		self.action.run(game_object_control, self.params)
+		if self.is_real_ref:
+			self.action.run(game_object_control, self.params)
+		else:
+			self.action.run(game_object_control, params)
+			
 
 
 class FireRef(Control):
 	def __init__(self):
 		self.param_values = []
+		self.is_real_ref = True
+
+	def reinit(self, game_object_control, params=[]):
+		self.reinit_params(params)
+		self.fire.reinit(game_object_control, params)
+
+	def reinit_params(self, params):
+		self.params = [val.get(params) for val in self.param_values]
 
 	def run_first(self, game_object_control, params=[]):
-		self.params = [val.get(params) for val in self.param_values]
 		self.fire = get_fire(self.namespace, self.label)
-		self.fire.run(game_object_control, self.params)
+		self.reinit_params(params)
 
 	def run_not_first(self, game_object_control, params = []):
-		game_object_control.turn_status = DONE
+		if self.is_real_ref:
+			self.fire.run(game_object_control, self.params)
+		else:
+			self.fire.run(game_object_control, params)
 
 
 
@@ -323,12 +485,12 @@ class FireRef(Control):
 ###########
 ## Values
 
-HEUR_VALID_FORMULA = re.compile(r'^([0-9.]|\$(rand|rank|[0-9])|\+|-|/|\*)*$')
+HEUR_VALID_FORMULA = re.compile(r'^([0-9.]|\$(rand|rank|[0-9])|\(|\)|\+|-|/|\*)*$')
 
 filter_definitions = [
   ( re.compile(r'\$rand'), '(random.random())' ),
-  ( re.compile(r'\$rank'), '(0.5)'),
-  ( re.compile(r'\$([0-9]+)'), r'(self.params[\1-1])') ]
+  ( re.compile(r'\$rank'), '(RANK)'),
+  ( re.compile(r'\$([0-9]+)'), r'(params[\1-1])') ]
 
 def substitute(r,repl):
 	# help fight the lambda abuses ! join now !
@@ -350,7 +512,7 @@ class Value:
 		  </changeSpeed>
 		should therefore be avoided ? Use a parameterized action instead.
 	"""
-	def __init__(self, formula):
+	def set_formula(self, formula):
 		formula.replace( '\n', '' )
 		if not HEUR_VALID_FORMULA.match(formula):
 			l.error( 'Invalid formula : ' + formula )
@@ -360,19 +522,70 @@ class Value:
 			old_formula = formula
 			for f in formula_filters:
 				formula = f(formula)
-		try:
-			eval(formula)
-		except:
-			logging.error( 'Invalid formula, interpreted as : ' + formula )
-			formula='0'
 		self.formula=formula
 
+	def eval_formula(self, params=[]):
+		try:
+			return float(eval(self.formula))
+		except:
+			l.error( 'Invalid formula, interpreted as : ' + self.formula )
+			self.formula='0'
+
 	def get(self, params=[]):
-		return float(eval(self.formula))
+		return self.eval_formula(params)
+
+class BasicValue(Value):
+	"""Most basic use of value.
+
+		Exists purely to be instanciated as BasicValue( formula )
+		"""
+	def __init__(self, formula):
+		self.set_formula(formula)
 		
+class Speed(Value):
+	"""Has a 'type' attribute.
 
+	Speed elements have two usages :
+	- standard controls (ie. not ChangeSpeed) will simply use
+	   .get_standard()
+	- ChangeSpeed will have to use .get() to get a base numerical
+	   value and adapt it according to .type
+		"""
+	def get_standard(self, game_object_control, params=[]):
+		initial_value = self.get(params)
+		if self.type == "absolute":
+			return initial_value
+		elif self.type == "relative":
+			return initial_value + game_object_control.game_object.speed
+		else: # sequence
+			try:
+				game_object_control.last_speed += self.get(params)
+			except AttributeError: #.last_speed
+				# default from noiz2sa
+				game_object_control.last_speed = 1
+			return game_object_control.last_speed
 
+class Direction(Value):
+	"""Has a 'type' attribute.
 
+	Follows the same usage rules as Speed."""
+	def get_standard(self, game_object_control, params=[]):
+		initial_value = self.get(params)
+		if self.type == "absolute":
+			return initial_value
+		elif self.type == "aim":
+			return initial_value + game_object_control.game_object.aim
+		elif self.type == "relative":
+			return initial_value + game_object_control.game_object.direction
+		else: # sequence
+			try:
+				game_object_control.last_direction += self.get(params)
+			except AttributeError:
+				game_object_control.last_direction = \
+				   game_object_control.game_object.direction + self.get(params)
+			return game_object_control.last_direction
+
+			
 
 
 
@@ -381,7 +594,7 @@ class Value:
 ## Builders
 
 # find appropriate name
-main_action = None
+main_actions = []
 current_namespace = "pie !"
 
 def get_random_name():
@@ -406,6 +619,8 @@ target_classes = {
 					 'bulletRef'       : BulletRef,
 					 'actionRef'       : ActionRef,
 					 'fireRef'         : FireRef,
+					 'speed'           : Speed,
+					 'direction'       : Direction,
 					 }
 
 
@@ -430,6 +645,9 @@ class Builder(object):
 			l.error( "Don't know what to do with %s in %s." % (self.element_name, builder.element_name) )
 			return
 		add_method( builder )
+
+	def add_attrs(self, attrs):
+		pass
 		
 	def post_build(self):
 		pass
@@ -458,6 +676,22 @@ class BulletmlBuilder(Builder):
 class BulletBuilder(Builder):
 	element_name="bullet"
 
+	def add_attrs(self, attrs):
+		try:
+			self.target.label = attrs.getValue('label')
+		except KeyError:
+			pass
+
+	def add_to_fire(self, fire_builder):
+		fire_builder.target.bulletref = self.get_ref()
+
+	def get_ref(self):
+		ref = BulletRef()
+		ref.is_real_ref = False
+		ref.namespace = current_namespace
+		ref.label = self.target.label
+		return ref
+
 	def register(self):
 		namespaces[current_namespace]['bullet'][self.target.label] = self.target
 
@@ -469,18 +703,21 @@ class BulletBuilder(Builder):
 		self.register()
 
 	def add_to_bulletml(self, bulletml_builder):
-		global main_action
-		if not main_action:
-			main_action = self.target
+		pass
 
 
 class ActionBuilder(Builder):
 	element_name="action"
 
+	def add_attrs(self, attrs):
+		try:
+			self.target.label = attrs.getValue('label')
+		except KeyError:
+			pass
+
 	def add_to_bulletml(self, bulletml_builder):
-		global main_action
-		if not main_action:
-			main_action = self.target
+		if self.target.label[:3] == "top":
+			namespaces[current_namespace]['main_actions'].append(self.target)
 
 	def add_to_repeat(self, repeat_builder):
 		repeat_builder.target.actionref = self.get_ref()
@@ -490,6 +727,7 @@ class ActionBuilder(Builder):
 
 	def get_ref(self):
 		ref = ActionRef()
+		ref.is_real_ref = False
 		ref.namespace = current_namespace
 		ref.label = self.target.label
 		# params are left untouched
@@ -509,16 +747,21 @@ class ActionBuilder(Builder):
 class FireBuilder(Builder):
 	element_name="fire"
 
+	def add_attrs(self, attrs):
+		try:
+			self.target.label = attrs.getValue('label')
+		except KeyError:
+			pass
+
 	def add_to_bulletml(self, bulletml_builder):
-		global main_action
-		if not main_action:
-			main_action = self.target
+		pass
 
 	def add_to_action(self, action_builder):
 		action_builder.target.subactions.append(self.get_ref())
 
 	def get_ref(self):
 		ref = FireRef()
+		ref.is_real_ref = False
 		ref.namespace = current_namespace
 		ref.label = self.target.label
 		return ref
@@ -555,7 +798,7 @@ class WaitBuilder(FormulaBuilder, SubActionBuilder):
 	element_name="wait"
 
 	def post_build(self):
-		self.target.term_value = Value(self.formula)
+		self.target.term_value = BasicValue(self.formula)
 		
 
 
@@ -571,64 +814,94 @@ class DirectionBuilder(FormulaBuilder):
 	element_name="direction"
 	
 	def add_to_changeDirection(self, changedirection_builder):
-		changedirection_builder.target.direction_value = Value(self.formula)
+		changedirection_builder.target.direction = self.target
 
 	def add_to_bullet(self, bullet_builder):
-		bullet_builder.target.direction_value = Value(self.formula)
+		bullet_builder.target.direction = self.target
 
 	def add_to_fire(self, fire_builder):
-		fire_builder.target.direction_value = Value(self.formula)
+		fire_builder.target.direction = self.target
+
+	def post_build(self):
+		self.target.set_formula(self.formula)
+
+	def add_attrs(self, attrs):
+		try:
+			self.target.type = attrs.getValue('type')
+		except KeyError:
+			self.target.type = "absolute"
+		if self.target.type not in ['aim', 'absolute', 'relative', 'sequence']:
+			self.target.type = "absolute"
+			l.error("unknown direction type : " + str(self.target.type))
 
 
 class SpeedBuilder(FormulaBuilder):
 	element_name="speed"
 
 	def add_to_changeSpeed(self, changespeed_builder):
-		changespeed_builder.target.speed_value = Value(self.formula)
+		changespeed_builder.target.speed = self.target
 
 	def add_to_bullet(self, bullet_builder):
-		bullet_builder.target.speed_value = Value(self.formula)
+		bullet_builder.target.speed = self.target
 
 	def add_to_fire(self, fire_builder):
-		fire_builder.target.speed_value = Value(self.formula)
+		fire_builder.target.speed = self.target
+
+	def post_build(self):
+		self.target.set_formula(self.formula)
+
+	def add_attrs(self, attrs):
+		try:
+			self.target.type = attrs.getValue('type')	
+		except KeyError:
+			self.target.type = "absolute"
+		if self.target.type not in ['absolute', 'relative', 'sequence']:
+			self.target.type = "absolute"
+			l.error("unknown speed type : " + str(self.target.type))
 
 
 class HorizontalBuilder(FormulaBuilder):
 	element_name="horizontal"
 
 	def add_to_accel(self, accel_builder):
-		accel_builder.target.horizontal_value = Value( self.formula )
+		accel_builder.target.horizontal_value = BasicValue( self.formula )
 
 
 class VerticalBuilder(FormulaBuilder):
 	element_name="vertical"
 
 	def add_to_accel(self, accel_builder):
-		accel_builder.target.vertical_value = Value( self.formula )
+		accel_builder.target.vertical_value = BasicValue( self.formula )
 
 
 class TermBuilder(FormulaBuilder):
 	element_name="term"
 
 	def add_to_changeDirection(self, changedirection_builder):
-		changedirection_builder.target.term_value = Value(self.formula)
+		changedirection_builder.target.term_value = BasicValue(self.formula)
 
 	def add_to_changeSpeed(self, changespeed_builder):
-		changespeed_builder.target.term_value = Value(self.formula)
+		changespeed_builder.target.term_value = BasicValue(self.formula)
 
 	def add_to_accel(self, accel_builder):
-		accel_builder.target.term_value = Value(self.formula)
+		accel_builder.target.term_value = BasicValue(self.formula)
 
 
 class TimesBuilder(FormulaBuilder):
 	element_name="times"
 
 	def add_to_repeat(self, repeat_builder):
-		repeat_builder.target.times_value = Value(self.formula)
+		repeat_builder.target.times_value = BasicValue(self.formula)
 
 
 class BulletRefBuilder(Builder, SubActionBuilder):
 	element_name="bulletRef"
+
+	def add_attrs(self, attrs):
+		try:
+			self.target.label = attrs.getValue('label')
+		except KeyError:
+			pass
 
 	def add_to_fire(self, fire_builder):
 		fire_builder.target.bulletref = self.target
@@ -637,12 +910,24 @@ class BulletRefBuilder(Builder, SubActionBuilder):
 class ActionRefBuilder(Builder, SubActionBuilder):
 	element_name="actionRef"
 
+	def add_attrs(self, attrs):
+		try:
+			self.target.label = attrs.getValue('label')
+		except KeyError:
+			pass
+
 	def add_to_repeat(self, repeat_builder):
 		repeat_builder.target.target = self.target # clumsy
 
 
 class FireRefBuilder(Builder, SubActionBuilder):
 	element_name="fireRef"
+
+	def add_attrs(self, attrs):
+		try:
+			self.target.label = attrs.getValue('label')
+		except KeyError:
+			pass
 
 	# done
 
@@ -651,7 +936,7 @@ class ParamBuilder(FormulaBuilder):
 	element_name="param"
 
 	def add_to_ref(self, ref_builder):
-		ref_builder.target.param_values.append( Value(self.formula) )
+		ref_builder.target.param_values.append( BasicValue(self.formula) )
 
 	add_to_actionRef = add_to_ref
 	add_to_fireRef = add_to_ref
@@ -698,29 +983,21 @@ class BulletMLHandler( xml.sax.handler.ContentHandler ):
 			current_object.add_text( chars.strip() )
 
 	def startDocument( self ):
-		global main_action
-		main_action = None
-
 		namespaces[current_namespace] = { 'action' : {},
 		                                  'fire'   : {},
-													 'bullet' : {} }
+													 'bullet' : {},
+													 'main_actions' : [] }
 
 	def endDocument( self ):
-		global main_action
-		if not main_action:
-			main_action = NullAction()
+		if not namespaces[current_namespace]['main_actions']:
+			namespaces[current_namespace]['main_actions'].append(NullAction())
 			l.warning( "No main action found in " + current_namespace )
-		main_actions[current_namespace] = main_action
-		main_action = None
 
 	def startElement( self, name, attrs ):
 		if name in builder_classes:
 			builder = builder_classes[name]()
 			current_object_stack.append( builder )
-			try:
-				builder.target.label = attrs.getValue('label')
-			except:
-				pass
+			builder.add_attrs(attrs) # does nothng if element doesn't like attrs
 		else:
 			l.warning( "Unknown element : " + name )
 
@@ -750,7 +1027,7 @@ def set_action_namespace( name ):
 	current_namespace = name
 
 def get_main_actions( name ):
-	if not name in main_actions:
+	if not name in namespaces:
 		set_action_namespace( name )
 		try:
 			f = open( name, 'r' )
@@ -758,27 +1035,46 @@ def get_main_actions( name ):
 			f.close()
 		except Exception,ex:
 			l.error( "Error while parsing BulletML file : " + name )
-			l.debug(ex)
-			return main_actions["null"]
-	return [ get_action(name, 'topmove'), get_action(name, 'topshot') ]
-		
-class GameObjectController:
-	master_actions=[]
-	
+			l.debug("Exception :" + str(ex))
+			raise
+			return namespaces["null"]['main_actions']
+	return copy.deepcopy(namespaces[name]['main_actions'])
+
+class GameObjectSubController:
+	def run(self, params=[]):
+		self.top_action.run(self, params)
+		# "top_action" sucks
+
+class GameObjectMainController:
+	def __init__(self):
+		self.sub_controllers = []
+		self.params = []
+
+	def add_action(self, action):
+		sub_controller = GameObjectSubController()
+		sub_controller.top_action = action
+		sub_controller.game_object = self.game_object
+		self.sub_controllers.append(sub_controller)
+
 	def set_behavior( self, name ): # name is really a namepace
-		self.master_actions = get_main_actions(name)
+		master_actions = get_main_actions(name)
+		self.sub_controllers = []
+		for master_action in master_actions:
+			self.add_action(master_action)
+
+	def set_game_object(self, game_object):
+		self.game_object = game_object
+		for sub_controller in self.sub_controllers:
+			sub_controller.game_object = game_object
 
 	def run(self):
-		#print self.master_actions
-		for act in self.master_actions:
-			act.run(self)
-
-	def add_control(self, control):
-		self.master_actions.append(control)
+		for sub_controller in self.sub_controllers:
+			sub_controller.run(self.params)
 
 
 ############
 ## Testing
+##  hopelessly bit rotten
 
 class FakeGameObject:
 	def __init__(self):
