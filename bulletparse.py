@@ -5,6 +5,7 @@ import logging
 import re
 import xml.sax, xml.sax.handler
 import copy
+import math
 
 import traceback
 
@@ -39,6 +40,7 @@ class NullAction:
 		pass
 
 # namespaces[namespace]['action'|'fire'|'bullet'][label] = <controller_object>
+# namespaces[namespace]['main_actions'] = [top_action1, top_action2, ...]
 namespaces = { "null" : { 'action' : {}, 'fire' : {}, 'bullet' : {}, 'main_actions' : [] } }
 
 def get_action(namespace, label):
@@ -97,31 +99,6 @@ class Bullet(Control):
 	def __init__(self):
 		self.subactions = []
 
-	def run_first(self, game_object_control, params=[]):
-		try:
-			game_object_control.game_object.direction = \
-			   self.direction.get_standard(game_object_control, params)
-		except AttributeError:
-			pass
-		try:
-			game_object_control.game_object.speed = self.speed.get_standard(params)
-		except AttributeError:
-			pass
-
-	def run_not_first(self, game_object_control, params=[]):
-		is_done = False
-		for child in self.subactions:
-			child.run( game_object_control, params )
-			if game_object_control.turn_status == CONTINUE:
-				is_done = False
-			elif game_object_control.turn_status == WAIT:
-				is_done = False
-				break
-		if is_done:
-			game_object_control.turn_status = DONE
-		else:
-			game_object_control.turn_status = CONTINUE
-
 # if an action is found in a file, build the action separately and ref it
 
 class Action(Control):
@@ -147,6 +124,7 @@ class Action(Control):
 			self.subactions[self.current_index].run(game_object_control, params)
 			if game_object_control.turn_status == DONE:
 				self.current_index += 1
+				self.run_not_first(game_object_control, params)
 			if self.current_index >= self.sub_length:
 				game_object_control.turn_status = DONE
 			else:
@@ -241,6 +219,8 @@ class Fire(Control):
 				numeric_direction = direction.get_standard(game_object_control, self.bulletref.params)
 			else:
 				numeric_direction = game_object_control.game_object.direction
+				if self.is_horizontal:
+					numeric_direction -= 90
 
 			if self.bulletref.is_real_ref:
 				main_control.params = self.bulletref.params
@@ -335,10 +315,77 @@ class ChangeSpeed(Control):
 	
 	
 
-class Accel:
-	horizontal=0
-	vertical=0
-	term=0
+class Accel(Control):
+	def run_first(self, game_object_control, params=[]):
+		self.term = self.term_value.get(params)
+		try:
+			self.horiz = self.horiz_value.get(params)
+			if self.term > 0:
+				self.horiz /= self.term
+			self.has_horiz = True
+		except AttributeError:
+			self.has_horiz = False
+		try:
+			self.vert = self.vert_value.get(params)
+			if self.term > 0:
+				self.vert /= self.term
+			self.has_vert = True
+		except AttributeError:
+			self.has_vert = False
+		self.frame = 0
+
+	def run_not_first(self, game_object_control, params=[]):
+		if self.frame > self.term:
+			game_object_control.turn_status = DONE
+		else:
+			self.frame += 1
+			game_object_control.turn_status = CONTINUE
+			if not (self.has_horiz or self.has_vert):
+				return
+			initial_speed = game_object_control.game_object.speed
+			initial_direction = game_object_control.game_object.direction
+			# on se ramene au cas vertical
+			if self.is_horizontal:
+				initial_direction -= 90
+				if self.has_horiz:
+					dy = self.horiz
+				else:
+					dy = 0
+				if self.has_vert:
+					dx = self.vert
+				else:
+					dx = 0
+			else:
+				if self.has_horiz:
+					dx = self.horiz
+				else:
+					dx = 0
+				if self.has_vert:
+					dy = - self.vert
+				else:
+					dy = 0
+			xx =   initial_speed * math.sin( initial_direction * math.pi / 180 )
+			yy = - initial_speed * math.cos( initial_direction * math.pi / 180 )
+			xx += dx
+			yy += dy
+			if abs(yy) < 0.000001:
+				if xx>0:
+					direction = 90
+					speed = xx
+				else:
+					direction = -90
+					speed = -xx
+			else:
+				direction = math.atan( - xx / yy ) * 180 / math.pi
+				if yy>0:
+					direction += 180
+				speed = math.sqrt( xx*xx + yy*yy )
+			if self.is_horizontal:
+				direction += 90
+			game_object_control.game_object.speed = speed
+			game_object_control.game_object.direction = direction
+
+					
 
 # note: correct way to build those is obviously to read full xml element then
 # construct object
@@ -357,11 +404,9 @@ class Accel:
 #       only, when passing parameters, use Value.get
 
 class Wait(Control):
-	duration=0
-
 	def run_first(self, game_object_control, params=[]):
 		self.term = self.term_value.get(params)
-		self.frame = -1
+		self.frame = 1
 
 	def run_not_first(self, game_object_control, params=[]):
 		if self.frame > self.term:
@@ -391,6 +436,7 @@ class Repeat(Control):
 				self.repetition += 1
 				if self.repetition != self.times:
 					self.actionref.reinit(game_object_control, params)
+					self.run_not_first(game_object_control, params)
 			game_object_control.turn_status = CONTINUE
 
 	def run_first(self, game_object, params):
@@ -418,18 +464,6 @@ class BulletRef(Control):
 	def get_bullet(self):
 		return get_bullet(self.namespace, self.label)
 
-	def run_first(self, game_object_control, params=[]):
-		self.bullet = get_bullet(self.namespace, self.label)
-		# Do not .reinit_params() ! Only Fire knew the appropriate params.
-
-	def run_not_first(self, game_object_control, params=[]):
-		# If real ref, has its own params to transmit.
-		if self.is_real_ref:
-			self.bullet.run(game_object_control, self.params)
-		else:
-			self.bullet.run(game_object_control, params)
-	
-
 class ActionRef(Control):
 	def __init__(self):
 		self.param_values = []
@@ -443,8 +477,8 @@ class ActionRef(Control):
 		self.params = [val.get(params) for val in self.param_values]
 		
 	def run_first(self, game_object_control, params=[]):
-		self.action = get_action(self.namespace, self.label)
 		self.reinit_params(params)
+		self.action = get_action(self.namespace, self.label)
 
 	def run_not_first(self, game_object_control, params=[]):
 		if self.is_real_ref:
@@ -572,18 +606,21 @@ class Direction(Value):
 	def get_standard(self, game_object_control, params=[]):
 		initial_value = self.get(params)
 		if self.type == "absolute":
-			return initial_value
+			numeric_direction =  initial_value
+			if self.is_horizontal:
+				numeric_direction -= 90
 		elif self.type == "aim":
-			return initial_value + game_object_control.game_object.aim
+			numeric_direction = initial_value + game_object_control.game_object.aim
 		elif self.type == "relative":
-			return initial_value + game_object_control.game_object.direction
+			numeric_direction = initial_value + game_object_control.game_object.direction
 		else: # sequence
 			try:
 				game_object_control.last_direction += self.get(params)
 			except AttributeError:
 				game_object_control.last_direction = \
 				   game_object_control.game_object.direction + self.get(params)
-			return game_object_control.last_direction
+			numeric_direction = game_object_control.last_direction
+		return numeric_direction
 
 			
 
@@ -596,6 +633,7 @@ class Direction(Value):
 # find appropriate name
 main_actions = []
 current_namespace = "pie !"
+is_horizontal = False
 
 def get_random_name():
 	return 'RND' + str(random.randint(100000,999999))
@@ -671,6 +709,17 @@ class SubActionBuilder:
 
 class BulletmlBuilder(Builder):
 	element_name =  "bulletml"
+
+	def add_attrs(self, attrs):
+		global is_horizontal
+		try:
+			type = attrs.getValue('type')
+		except KeyError:
+			type = "none"
+		if type == "horizontal":
+			is_horizontal = True
+		else:
+			is_horizontal = False
 
 
 class BulletBuilder(Builder):
@@ -775,6 +824,7 @@ class FireBuilder(Builder):
 		except:
 			self.target.label = get_unused_name('fire')
 		self.register()
+		self.target.is_horizontal = is_horizontal
 
 
 class ChangeDirectionBuilder(Builder, SubActionBuilder):
@@ -785,14 +835,11 @@ class ChangeSpeedBuilder(Builder, SubActionBuilder):
 	element_name="changeSpeed"
 
 
-class AccelBuilder(Builder):
+class AccelBuilder(Builder, SubActionBuilder):
 	element_name="accel"
 
-	def build(self):
-		self.target.term = self.term
-		self.target.horizontal = self.horizontal
-		self.target.vertical = self.vertical
-
+	def post_build(self):
+		self.target.is_horizontal = is_horizontal
 
 class WaitBuilder(FormulaBuilder, SubActionBuilder):
 	element_name="wait"
@@ -824,6 +871,7 @@ class DirectionBuilder(FormulaBuilder):
 
 	def post_build(self):
 		self.target.set_formula(self.formula)
+		self.target.is_horizontal = is_horizontal
 
 	def add_attrs(self, attrs):
 		try:
@@ -864,14 +912,14 @@ class HorizontalBuilder(FormulaBuilder):
 	element_name="horizontal"
 
 	def add_to_accel(self, accel_builder):
-		accel_builder.target.horizontal_value = BasicValue( self.formula )
+		accel_builder.target.horiz_value = BasicValue( self.formula )
 
 
 class VerticalBuilder(FormulaBuilder):
 	element_name="vertical"
 
 	def add_to_accel(self, accel_builder):
-		accel_builder.target.vertical_value = BasicValue( self.formula )
+		accel_builder.target.vert_value = BasicValue( self.formula )
 
 
 class TermBuilder(FormulaBuilder):
