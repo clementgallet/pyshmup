@@ -143,8 +143,8 @@ class Action(Control):
 class Fire(Control):
 	def reinit_launch(self, game_object_control, params=[]):
 		"""Builds the argument list for fire()."""
-		control = GameObjectMainController()
-		sub_control = GameObjectSubController()
+		control = BulletMLController()
+		sub_control = BulletMLSubController()
 #		self.bulletref.reinit(game_object_control, params=[])
 		sub_control.top_action = copy.deepcopy(self.bulletref)
 		control.sub_controllers = [sub_control]
@@ -159,7 +159,7 @@ class Fire(Control):
 		if not self.already_fired:
 			self.already_fired = True
 
-			main_control = GameObjectMainController()
+			main_control = BulletMLController()
 			main_control.game_object = game_object_control.game_object
 
 			bullet = self.bulletref.get_bullet()
@@ -189,20 +189,20 @@ class Fire(Control):
 			try:
 				speed = bullet.speed
 				speed_location = BULLET
-			except: pass
+			except AttributeError: pass
 			try:
 				direction = bullet.direction
 				direction_location = BULLET
-			except: pass
+			except AttributeError: pass
 
 			try:
 				speed = self.speed
 				speed_location = FIRE
-			except: pass
+			except AttributeError: pass
 			try:
 				direction = self.direction
 				direction_location = FIRE
-			except: pass
+			except AttributeError: pass
 
 			self.bulletref.reinit_params(params)
 
@@ -1088,18 +1088,18 @@ def get_main_actions( name ):
 			return namespaces["null"]['main_actions']
 	return copy.deepcopy(namespaces[name]['main_actions'])
 
-class GameObjectSubController:
+class BulletMLSubController:
 	def run(self, params=[]):
 		self.top_action.run(self, params)
 		# "top_action" sucks
 
-class GameObjectMainController:
+class BulletMLController:
 	def __init__(self):
 		self.sub_controllers = []
 		self.params = []
 
 	def add_action(self, action):
-		sub_controller = GameObjectSubController()
+		sub_controller = BulletMLSubController()
 		sub_controller.top_action = action
 		sub_controller.game_object = self.game_object
 		self.sub_controllers.append(sub_controller)

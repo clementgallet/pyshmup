@@ -1,0 +1,56 @@
+<?xml version="1.0" ?>
+<!DOCTYPE bulletml SYSTEM "http://www.asahi-net.or.jp/~cs8k-cyu/bulletml/bulletml.dtd">
+
+<bulletml type="vertical"
+          xmlns="http://www.asahi-net.or.jp/~cs8k-cyu/bulletml">
+
+<action label="topmove">
+ <changeSpeed>
+ <speed>0</speed>
+ <term>1</term>
+ </changeSpeed>
+ <repeat>
+  <times>20+30*$rank</times>
+  <action>
+   <changeDirection>
+   <direction type="sequence">
+    ($rand-0.5)*12
+   </direction>
+   <term>20</term>
+	</changeDirection>
+  </action>
+ </repeat>
+ <vanish/>
+</action>
+
+<action label="topshot">
+ <repeat>
+  <times>(20+30*$rank)*4</times>
+  <action>
+   <fire>
+	 <direction type="relative">$rand-0.5</direction>
+	 <speed type="absolute">1</speed>
+	 <bulletRef label="nrm"/>
+	</fire>
+	<wait>5</wait>
+  </action>
+ </repeat>
+</action>
+
+<bullet label="nrm">
+<action>
+ <fire>
+  <bulletRef label="dumb"/>
+  <direction type="relative">5*$rank-10</direction>
+ </fire>
+ <fire>
+  <bulletRef label="dumb"/>
+  <direction type="relative">10-5*$rank</direction>
+ </fire>
+ <vanish/>
+</action>
+</bullet>
+
+<bullet label="dumb"> <action/> </bullet>
+
+</bulletml>

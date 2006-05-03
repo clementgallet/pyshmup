@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import bulletparse
-from bulletparse import GameObjectMainController
+import bulletml
+from bulletml import BulletMLController
+import sprite
 
 NO_GRAPHICS = False
 
@@ -11,6 +12,8 @@ import math
 import time
 import random
 import copy
+from OpenGL.GL import * # evil
+from OpenGL.GLU import * 
 
 import profile
 
@@ -20,47 +23,48 @@ import profile
 KEY_SHOT = pygame.K_q
 #KEY_SHOT = pygame.K_W
 
-PARTIAL_UPDATE = True
-
 DRAW_HITBOX = True
 
 FONKY_LINES = True
 
-WIDTH = 200
-HEIGHT = 150
-#SHIP_BITMAP = "data/images/ship.png"
-SHIP_BITMAP = "data/images/shot_small.png"
-#ENEMY_SHOT_BITMAP = "data/images/shot.png"
-ENEMY_SHOT_BITMAP = "data/images/shot_small.png"
+WIDTH = 640
+HEIGHT = 480
+
+SHIP_BITMAP = "data/images/ship.png"
+#SHIP_BITMAP = "data/images/shot_small.png"
+ENEMY_SHOT_BITMAP = "data/images/shot.png"
+#ENEMY_SHOT_BITMAP = "data/images/shot_small.png"
 #FILE = "data/bullets/doud.xml"
 #FILE = "data/bullets/doud_synch.xml"
 #FILE = "data/bullets/doud_directed_rand_smooth.xml"
-#FILE = "data/bullets/bullets/doud_circles.xml"
-FILE = 'data/bullets/struggle.xml'
+FILE = "data/bullets/doud_circles.xml"
+#FILE = 'data/bullets/struggle.xml'
 #FILE = 'data/bullets/bee.xml'
 #FILE = 'data/bullets/slowdown.xml'
 #FILE = 'data/bullets/beewinder.xml'
 #FILE = 'data/bullets/side_cracker.xml'
-#FILE = 'data/data/bullets/roll3pos.xml'
+#FILE = 'data/bullets/roll3pos.xml'
 #FILE = 'data/bullets/rollbar.xml'
-#FILE = 'data/bullets/bullets/keylie_360.xml'
+#FILE = 'data/bullets/keylie_360.xml'
 #FILE = 'data/bullets/double_roll_seeds.xml'
 #FILE = 'data/bullets/[ketsui]_r4_boss_rb_rockets.xml'
-#FILE = 'data/bullets/quad3.xml'
+FILE = 'data/bullets/quad3.xml'
 #FILE = 'data/bullets/roll.xml'
 #FILE = 'data/bullets/4waccel.xml'
 #FILE = 'data/bullets/248shot.xml'
-#FILE = 'data/data/bullets/bar.xml'
+#FILE = 'data/bullets/bar.xml'
 #FILE = 'data/bullets/[Ikaruga]_r5_vrp.xml'
-FILE = 'data/bullets/[Progear]_round_3_boss_back_burst.xml'
+#FILE = 'data/bullets/[Progear]_round_3_boss_back_burst.xml'
 
-OUT_LIMIT = 0.2
+OUT_LIMIT = 0.2 # out-of-screen is e.g. x > width*(1+OUT_LIMUT)
 
-RADIUS = 3
+RADIUS = 3.0 # player's "hit-disc" radius, in game units
 
-SCALE = 1.0/500
+PLAYER_SPEED = 2.0
 
-RANK = 1.0
+SCALE = 400 # screen height in game units
+
+RANK = 1 # difficulty setting, 0 to 1
 
 FPS = 60
 MAX_SKIP = 9
@@ -68,23 +72,20 @@ MAX_SKIP = 9
 SHOT_TIME = 40
 SHOT_FAST = 1 # in presses every SHOT_TIME frames
 
-BACKGROUND_COLOR = (60, 70, 70)
+BACKGROUND_COLOR = (.235, .275, .275, 1)
 
 #####################
 ## Derived constants
 
-SIZE_FACTOR = SCALE * WIDTH
+RADIUS2 = RADIUS * RADIUS
 
-RADIUS2_PIXELS = (RADIUS*SIZE_FACTOR)**2
-LINE_RADIUS2_PIXELS = 1600*RADIUS2_PIXELS
+UNIT_HEIGHT = SCALE/2
+UNIT_WIDTH = (UNIT_HEIGHT * WIDTH) / HEIGHT
 
 if FONKY_LINES:
-	PARTIAL_UPDATE = False
-	FONKY_COLOR = [50, 60, 65]
+	LINE_RADIUS2 = 10000*RADIUS2
+	FONKY_COLOR = [.205, .245, .245, 1]
 	FONKY_OFFSET = [ BACKGROUND_COLOR[i] - FONKY_COLOR[i] for i in [0,1,2] ]
-
-if PARTIAL_UPDATE:
-	BACKGROUND_COLOR = (0, 0, 0)
 
 ############
 ## Logging
@@ -98,9 +99,28 @@ logging.getLogger('').addHandler( console )
 l = logging.getLogger('main')
 l.setLevel(logging.DEBUG)
 
+############
+## Graphics
+
+def set_perspective(width, height):
+	global screen
+	screen = pygame.display.set_mode( (width, height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE )
+
+	glViewport(0, 0, width, height)
+
+	glMatrixMode(GL_PROJECTION)
+	glLoadIdentity()
+	fov = 30
+	dist = SCALE*math.tan(math.pi/8)/math.tan(fov*math.pi/360)
+#	gluPerspective(fov, float(width)/height, dist*0.5, dist*1.5)
+	gluPerspective(fov, float(WIDTH)/HEIGHT, dist*0.5, dist*1.5)
+	glMatrixMode(GL_MODELVIEW)
+	glLoadIdentity()
+	glTranslate(0, 0, -dist)#
+
 images = {}
 
-bulletparse.RANK = RANK
+bulletml.RANK = RANK
 
 def get_image(name):
 	if name in images:
@@ -139,39 +159,45 @@ def init_sdl():
 			l.warning("Some SDL modules failed to initialize.")
 
 	global screen
-	screen = pygame.display.set_mode( (WIDTH,HEIGHT), pygame.DOUBLEBUF | pygame.HWSURFACE )
-	pygame.display.set_caption("TOUCHED BY HIS NOODLY APPENDAGE")
+	screen = pygame.display.set_mode( (WIDTH,HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE )
+
+	set_perspective(WIDTH, HEIGHT)
+
+	glClearColor(*BACKGROUND_COLOR)
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE)#_MINUS_SRC_ALPHA)
+	glEnable(GL_BLEND)
+
+	glEnable(GL_TEXTURE_2D)
+
+	pygame.display.set_caption("FIVE TONS OF FLAX !")
 	
 		
 																						
-# this is not intended to be particurly exten{ded,sible}
+# this is not intended to be particularly exten{ded,sible}
 update_list = []
 bullet_list = []
 player_list = []
 
 class SimpleBullet:
-	direction = 0.0
-	speed = 0.0
-	x = WIDTH / 2.0
-	y = HEIGHT / 2.0
-
 	def __init__(self):
-		self.controller = GameObjectMainController()
+		self.direction = 0
+		self.speed = 0
+		self.x = 0
+		self.y = UNIT_HEIGHT * 0.5
+
+		self.controller = BulletMLController()
 		self.controller.game_object = self
 		self.controller.set_behavior(FILE)
 
-		self.image = get_image( ENEMY_SHOT_BITMAP )
-		self.rect = self.image.get_rect()
-		self.rect.center = (self.x, self.y)
-		if PARTIAL_UPDATE:
-			self.last_rect = copy.deepcopy(self.rect)
-			self.temp_rect = copy.deepcopy(self.rect)
+		self.sprite = sprite.get_sprite( ENEMY_SHOT_BITMAP )
 
 		update_list.append(self)
 		bullet_list.append(self)
 		self.to_remove = False
 
-
+		self.t = 0
+		self.sin_spd = random.random() * 0.04
+		
 	def fire(self, controller, direction=None, speed=None):
 		new_bullet = SimpleBullet()
 		new_bullet.controller = controller 
@@ -188,19 +214,22 @@ class SimpleBullet:
 			new_bullet.speed = self.speed
 
 	def update(self):
-		if self.x < -WIDTH*OUT_LIMIT  or self.x > WIDTH*(1+OUT_LIMIT) or \
-		   self.y < -HEIGHT*OUT_LIMIT or self.y > HEIGHT*(1+OUT_LIMIT):
+		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
+		   self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT):
 			self.to_remove = True
 		self.controller.run()
-		self.x += math.sin(self.direction*math.pi/180)*self.speed*SIZE_FACTOR
-		self.y += math.cos(self.direction*math.pi/180)*self.speed*SIZE_FACTOR
-		self.rect.center = (self.x, self.y)
+		self.x += math.sin(self.direction*math.pi/180)*self.speed
+		self.y -= math.cos(self.direction*math.pi/180)*self.speed
+		self.t = (self.t+self.sin_spd) % (2*math.pi)
 
 	def draw(self):
-		screen.blit(self.image, self.rect)
-		if PARTIAL_UPDATE:
-			self.last_rect.center = self.temp_rect.center
-			self.temp_rect.center = self.rect.center
+		glPushMatrix()
+		glColor4f(1.0, 1.0, 1.0, 0.2)
+		glTranslatef(self.x, self.y, 0)#math.sin(self.t)*5)
+#		glRotatef(self.t * 180/math.pi, 0, 0, 1)
+		self.sprite.draw()
+		glPopMatrix()
+		#glTranslatef(-self.x, -self.y, 0)
 
 	def vanish(self):
 		self.to_remove = True
@@ -221,17 +250,17 @@ class Player:
 		if keys[pygame.K_LEFT]:
 			dx -= 1
 		if keys[pygame.K_UP]:
-			dy -= 1
-		if keys[pygame.K_DOWN]:
 			dy += 1
-		self.x += dx*WIDTH*SCALE
-		self.y += dy*WIDTH*SCALE
-		self.rect.center=(self.x,self.y)
+		if keys[pygame.K_DOWN]:
+			dy -= 1
+		self.x += dx*PLAYER_SPEED
+		self.y += dy*PLAYER_SPEED
 		#s = ([[b.x,b.y,self.x, self.y, (b.x-self.x)**2+(b.x-self.y)**2] for b in bullet_list])# < RADIUS:
 		#random.shuffle(s)
 		#print s[0]
-		if min([(b.x-self.x)**2+(b.y-self.y)**2 for b in bullet_list]) < RADIUS2_PIXELS:
-			self.to_remove = True
+		if bullet_list:
+			if min([(b.x-self.x)**2+(b.y-self.y)**2 for b in bullet_list]) < RADIUS2:
+				self.to_remove = True
 			
 		# "front montant"
 		shot_pressed = (not self.last_shot_pressed) and keys[KEY_SHOT]
@@ -286,13 +315,8 @@ class Player:
 			
 
 	def __init__(self):
-		self.image = get_image(SHIP_BITMAP)
-		self.rect = self.image.get_rect()
-		self.temp_rect = copy.deepcopy(self.rect)
-		self.last_rect = copy.deepcopy(self.rect)
-		self.x = WIDTH/2
-		self.y = HEIGHT*4/5
-		self.rect.center = (self.x, self.y)
+		self.x = 0.0
+		self.y = -UNIT_HEIGHT * .5
 		self.to_remove = False
 		update_list.append(self)
 		player_list.append(self)
@@ -302,88 +326,118 @@ class Player:
 		self.last_shot_pressed = False
 		self.shot_pressed = False
 		self.shot_count = 0
+
+		self.sprite = sprite.get_sprite(SHIP_BITMAP)
+
+		i = 1
+		while glIsList(i):
+			i += 1
+		glNewList(i, GL_COMPILE)
+		
+		glColor4f(1.0, 0.0, 1.0, 0.5)
+		glDisable(GL_TEXTURE_2D)
+		glBegin(GL_TRIANGLE_FAN)
+		NB_STRIPS = 32
+		glVertex2f(0., 0.)
+		for k in xrange(NB_STRIPS+1):
+			glVertex2f(RADIUS * math.cos(2 * math.pi * k / NB_STRIPS),
+			           RADIUS * math.sin(2 * math.pi * (-k) / NB_STRIPS))
+		glEnd()
+		glColor4f(1., 1., 1., 1.)
+
+		glEndList()
+		self.circle_list = i
+
+		self.t=0
 		
 	def draw(self):
 		if FONKY_LINES:
 			for b in bullet_list:
-				coeff = ((float(self.x)-b.x)**2+(self.y-b.y)**2)/LINE_RADIUS2_PIXELS
+				coeff = ((float(self.x)-b.x)**2+(self.y-b.y)**2)/LINE_RADIUS2
 				if coeff <= 1:
-					color = [ FONKY_COLOR[i] + FONKY_OFFSET[i] * coeff for i in [0,1,2] ]
-					pygame.draw.line(screen, color, (self.x, self.y), (b.x, b.y))
-		if DRAW_HITBOX and FONKY_LINES:
-			pygame.draw.circle(screen, FONKY_COLOR, (int(self.x), int(self.y)), int(RADIUS*SIZE_FACTOR))
-		screen.blit(self.image, self.rect)
-		self.last_rect.center = self.temp_rect.center
-		self.temp_rect.center = self.rect.center
+					FONKY_COLOR[3] = (1-coeff) ** 2 # alpha component
+					glColor4f(*FONKY_COLOR)
+					glBegin(GL_LINES)
+					glVertex2f(b.x, b.y)
+					glVertex2f(self.x, self.y)
+					glEnd()
+			glColor4f(1.0, 1.0, 1.0, 1.0)
+		#if DRAW_HITBOX and FONKY_LINES:
+		#	pygame.draw.circle(screen, FONKY_COLOR, (int(self.x), int(self.y)), int(RADIUS))
+		glPushMatrix()
+		glTranslatef(self.x, self.y, 0)
+		self.t = (self.t+1)%360
+		glRotatef(self.t, 0, 0, 1)
+		self.sprite.draw()
+		glCallList(self.circle_list)
+		glPopMatrix()
+		
 
 fskip = 0
+next_ticks = 0
 def get_turn_actions():
-	global old_ticks
+	global next_ticks
 	global skip_c, fskip
+	if next_ticks == 0:
+		next_ticks = pygame.time.get_ticks() + 1000/FPS
 	new_ticks = pygame.time.get_ticks()
-	next_ticks = old_ticks + 1000/FPS
-	old_ticks = next_ticks
-	if new_ticks <= next_ticks or fskip > MAX_SKIP:
+	if new_ticks <= next_ticks:
 		pygame.time.wait(next_ticks - new_ticks)
+		fskip = 0
+		next_ticks += 1000/FPS
+		return 2
+	elif fskip > MAX_SKIP:
+		next_ticks = new_ticks + 1000/FPS
 		fskip = 0
 		return 2
 	else:
 		skip_c += 1
 		fskip += 1
-	if fskip > MAX_SKIP:
-		next_ticks = new_ticks + 1000/FPS
+		next_ticks += 1000/FPS
+		return 1
 
 skip_c = 0
 def main():
-	global old_ticks
+	global bullet_list
 	init_sdl()
 	x=0
 	first_ticks = pygame.time.get_ticks()
 	frame = 0
 	vframe = 0
 	max_ob = 0
-	old_ticks = pygame.time.get_ticks()
 	Player()
 	SimpleBullet()
-#	SimpleBullet()
-#	SimpleBullet()
-#	SimpleBullet()
-#	SimpleBullet()
-#	SimpleBullet()
-#	SimpleBullet()
-#	SimpleBullet()
-	last_rects = []
 	while bullet_list:
-		while pygame.event.get():
-			pass
+		for ev in pygame.event.get():
+			if ev.type == pygame.VIDEORESIZE:
+				set_perspective(ev.w, ev.h)
+			if ev.type == pygame.QUIT:
+				bullet_list = []
+		keys = pygame.key.get_pressed()
+		if keys[pygame.K_ESCAPE]:
+			break
 		turn_actions = get_turn_actions()
 		if len(update_list) > max_ob:
 			max_ob = len(update_list)
 		for object in update_list:
 			object.update()
+			pass
 		for list in [update_list, player_list, bullet_list]:
 			for object in [object for object in list if object.to_remove]:
 				list.remove(object)
-				if PARTIAL_UPDATE and list == update_list:
-					pygame.display.update(object.temp_rect)
 		if turn_actions >= 2:
 			vframe += 1
 			for object in update_list:
 				object.draw()
-			if PARTIAL_UPDATE:
-				pygame.display.update([b.rect for b in update_list] + [b.last_rect for b in update_list])
-			else:
-				pygame.display.flip()
-			screen.fill( BACKGROUND_COLOR )
+				pass
+			pygame.display.flip()
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 		frame += 1
 		
-		#pygame.display.update(pygame.Rect(200,200,100,100))
-		#time.sleep(.02)
-		#print bullet.x, bullet.y
-	print "Gameplay  fps :", float(frame)/(pygame.time.get_ticks()-first_ticks)*1000
-	print "Graphical fps :", float(vframe)/(pygame.time.get_ticks()-first_ticks)*1000
-	print skip_c, "skips"
-	print "max objects # :", max_ob
+	l.info("Gameplay  fps : " + str(float(frame)/(pygame.time.get_ticks()-first_ticks)*1000))
+	l.info("Graphical fps : " + str(float(vframe)/(pygame.time.get_ticks()-first_ticks)*1000))
+	l.info( str(skip_c) + " skips")
+	l.info( "max objects # : " + str(max_ob))
 
 
 if __name__ == '__main__':

@@ -1,0 +1,131 @@
+<?xml version="1.0" ?>
+<!DOCTYPE bulletml SYSTEM "http://www.asahi-net.or.jp/~cs8k-cyu/bulletml/bulletml.dtd">
+
+<bulletml type="vertical"
+          xmlns="http://www.asahi-net.or.jp/~cs8k-cyu/bulletml">
+
+<action label="top">
+<fire>
+<direction>0</direction>
+<speed>2</speed>
+<bulletRef label="first">
+<param>1</param>
+</bulletRef>
+</fire>
+<fire>
+<direction>180</direction>
+<speed>2</speed>
+<bulletRef label="first">
+<param>-1</param>
+</bulletRef>
+</fire>
+<vanish/>
+</action>
+
+<bullet label="first">
+<action>
+<wait>90</wait>
+<changeSpeed>
+<term>5</term>
+<speed>0</speed>
+</changeSpeed>
+<repeat><times>6</times>
+<action>
+<fire>
+<direction>90</direction>
+<speed type="sequence">1.5</speed>
+<bulletRef label="second">
+<param>1</param>
+<param>$1</param>
+</bulletRef>
+</fire>
+<fire>
+<direction>-90</direction>
+<speed type="sequence">1.5</speed>
+<bulletRef label="second">
+<param>-1</param>
+<param>$1</param>
+</bulletRef>
+</fire>
+</action>
+</repeat>
+<vanish/>
+</action>
+</bullet>
+
+<bullet label="second">
+<action>
+<wait>20</wait>
+<changeSpeed>
+<speed>0</speed>
+<term>5</term>
+</changeSpeed>
+<repeat><times>3</times>
+<action>
+<repeat><times>2</times>
+<action>
+<repeat><times>6</times>
+<action>
+<fire>
+<direction>$2*(90+$1*15)+90</direction>
+<bulletRef label="shot"/>
+</fire>
+<wait>10</wait>
+</action>
+</repeat>
+<wait>40+40*$rand</wait>
+</action>
+</repeat>
+<repeat><times>15</times>
+<action>
+<repeat><times>6</times>
+<action>
+<fire>
+<direction type="sequence">$2*($1/2)</direction>
+<bulletRef label="shot"/>
+</fire>
+<wait>10</wait>
+</action>
+</repeat>
+<wait>40+40*$rand</wait>
+</action>
+</repeat>
+<repeat><times>2</times>
+<action>
+<repeat><times>6</times>
+<action>
+<fire>
+<direction>$2*(90+$1*60)+90</direction>
+<bulletRef label="shot"/>
+</fire>
+<wait>10</wait>
+</action>
+</repeat>
+<wait>40+40*$rand</wait>
+</action>
+</repeat>
+<repeat><times>15</times>
+<action>
+<repeat><times>6</times>
+<action>
+<fire>
+<direction type="sequence">$2*((-1*$1)/2)</direction>
+<bulletRef label="shot"/>
+</fire>
+<wait>10</wait>
+</action>
+</repeat>
+<wait>40+40*$rand</wait>
+</action>
+</repeat>
+</action>
+</repeat>
+<vanish/>
+</action>
+</bullet>
+
+<bullet label="shot">
+<speed>1</speed>
+</bullet>
+
+</bulletml>

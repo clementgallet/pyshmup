@@ -1,0 +1,76 @@
+<?xml version="1.0" ?>
+<!DOCTYPE bulletml SYSTEM "http://www.asahi-net.or.jp/~cs8k-cyu/bulletml/bulletml.dtd">
+
+<bulletml type="vertical"
+          xmlns="http://www.asahi-net.or.jp/~cs8k-cyu/bulletml">
+
+<action label="top">
+ <repeat>
+  <times>2</times>
+  <action>
+   <fire>
+    <bulletRef label="round_seed">
+     <param>1</param>
+     <param>0</param>
+    </bulletRef>
+   </fire>
+   <wait>60</wait>
+   <fire>
+    <bulletRef label="round_seed">
+     <param>1</param>
+     <param>22.5</param>
+    </bulletRef>
+   </fire>
+   <wait>60</wait>
+  </action>
+ </repeat>
+ <vanish/>
+</action>
+
+<bullet label="round_seed">
+ <action>
+  <repeat>
+   <times>8-$1</times>
+   <action>
+    <repeat>
+     <times>18</times>
+     <action>
+      <fire>
+       <direction type="sequence">20</direction>
+       <bulletRef label="circle_shot">
+        <param>$1*45+$2</param>
+       </bulletRef>
+      </fire>
+     </action>
+    </repeat>
+    <fire>
+     <bulletRef label="round_seed">
+      <param>$1+1</param>
+      <param>$2</param>
+     </bulletRef>
+    </fire>
+    <vanish/>
+    <wait>1</wait>
+   </action>
+  </repeat>
+  <vanish/>
+  <wait>1</wait>
+ </action>
+</bullet>
+
+<bullet label="circle_shot">
+ <speed>8</speed>
+ <action>
+  <wait>1</wait>
+  <changeSpeed>
+   <speed>1</speed>
+   <term>1</term>
+  </changeSpeed>
+  <changeDirection>
+   <direction type="absolute">$1</direction>
+   <term>1</term>
+  </changeDirection>
+ </action>
+</bullet>
+
+</bulletml>

@@ -1,0 +1,18 @@
+<!ELEMENT sprite (image | anim)>
+
+<!ELEMENT image (location, center, apparent_size)>
+
+<!ELEMENT location (#PCDATA)>
+
+<!ELEMENT center (x, y)>
+<!ELEMENT x (#PCDATA)>
+<!ELEMENT y (#PCDATA)>
+
+<!ELEMENT apparent_size (width, height)>
+<!ELEMENT width (#PCDATA)>
+<!ELEMENT height (#PCDATA)>
+
+<!ELEMENT anim (frame+)>
+
+<!ELEMENT frame (image,duration)>
+<!ELEMENT duration (#PCDATA)>

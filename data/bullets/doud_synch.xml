@@ -1,0 +1,125 @@
+<?xml version="1.0" ?>
+<!DOCTYPE bulletml SYSTEM "http://www.asahi-net.or.jp/~cs8k-cyu/bulletml/bulletml.dtd">
+
+<bulletml type="vertical"
+          xmlns="http://www.asahi-net.or.jp/~cs8k-cyu/bulletml">
+
+<action label="top">
+ <fire>
+  <bulletRef label="real_seed">
+   <param>1</param>
+  </bulletRef>
+ </fire>
+ <fire>
+  <bulletRef label="real_seed">
+   <param>-1</param>
+  </bulletRef>
+ </fire>
+ <wait>4</wait>
+ <repeat>
+  <times>3+5*$rank</times>
+  <action>
+   <fire>
+    <bulletRef label="fake_seed">
+	  <param>1</param>
+	 </bulletRef>
+   </fire>
+   <fire>
+    <bulletRef label="fake_seed">
+	  <param>-1</param>
+	 </bulletRef>
+   </fire>
+	<wait> 4 </wait>
+  </action>
+ </repeat>
+ <vanish/>
+</action>
+
+<bullet label="real_seed">
+ <speed>1</speed>
+ <direction>$1*90</direction>
+ <action>
+  <wait> 150 </wait>
+  <changeSpeed>
+   <term>5</term>
+	<speed>0</speed>
+  </changeSpeed>
+  <changeDirection>
+   <direction>0</direction>
+	<term>1</term>
+  </changeDirection>	
+  <wait>100</wait>
+  <fire>
+   <direction>0</direction>
+   <speed>0</speed>
+   <bulletRef label="blank_shot"/>
+  </fire>
+  <repeat>
+   <times>4+5*$rank</times>
+   <action>
+    <fire>
+     <speed type="sequence">3.0/(4+5*$rank)</speed>
+     <direction>0</direction>
+     <bulletRef label="seed_step2">
+      <param>$1</param>
+     </bulletRef>
+    </fire>
+   </action>
+  </repeat>
+  <vanish/>
+ </action> 
+</bullet>
+
+<bullet label="blank_shot">
+ <action>
+  <vanish/>
+ </action>
+</bullet>
+
+<bullet label="fake_seed">
+ <speed>1</speed>
+ <direction>$1*90</direction>
+ <action>
+  <wait>150</wait>
+  <vanish/>
+ </action>
+</bullet>
+
+<bullet label="seed_step2">
+ <action>
+  <wait>60</wait>
+  <changeSpeed>
+   <term>5</term>
+	<speed>0</speed>
+  </changeSpeed>
+  <wait>200</wait> 
+  <fire>
+   <direction type="relative">(0-$1)*(90+90/1)</direction>
+	<bulletRef label="nrm">
+	 <param>$1</param>
+	</bulletRef>
+  </fire>
+  <repeat>
+   <times>6+$rank*6</times>
+   <action>
+    <fire>
+     <bulletRef label="nrm">
+	   <param>$1</param>
+	  </bulletRef>
+     <direction type="sequence">$1*180.0/(6.0+6*$rank)</direction>
+    </fire>
+    <wait>15/(3+9*$rank)</wait>
+   </action>
+  </repeat>
+  <vanish/>
+ </action> 
+</bullet>
+
+ 
+
+<bullet label="nrm">
+ <speed>0.5+0.5*$rank</speed>
+ <action/>
+</bullet>
+
+</bulletml>

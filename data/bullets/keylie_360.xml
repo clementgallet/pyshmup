@@ -1,0 +1,79 @@
+<?xml version="1.0" ?>
+
+<!DOCTYPE bulletml SYSTEM "http://www.asahi-net.or.jp/~cs8k-cyu/bulletml/bulletml.dtd">
+
+
+
+<bulletml type="horizontal"
+
+xmlns="http://www.asahi-net.or.jp/~cs8k-cyu/bulletml">
+
+         
+
+<action label="top">
+
+<repeat> <times>30</times>
+
+<action>
+
+<fire>
+
+<direction type="sequence">360*$rand</direction>
+
+<bulletRef label="changeStraight"/>
+
+</fire>
+
+<wait>1</wait>
+
+</action>
+
+</repeat>
+
+</action>
+
+
+
+<bullet label="changeStraight">
+
+<speed>2</speed>
+
+<action>
+
+<changeSpeed>
+
+<speed>0</speed>
+
+<term>80</term>
+
+</changeSpeed>
+
+<wait>50</wait>
+
+<repeat> <times> 10 </times>
+
+<action>
+
+<fire>
+
+<direction type="sequence">360*$rand</direction>
+
+<bulletRef label="changeStraight"/>
+
+</fire>
+<wait>6</wait>
+</action>
+
+</repeat>
+
+<vanish/>
+
+</action>
+
+</bullet>
+
+
+
+</bulletml>
+
+			  

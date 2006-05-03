@@ -1,0 +1,15 @@
+
+
+<sprite>
+ <image>
+  <location> ship.png </location>
+  <center>
+   <x> 30 </x>
+   <y> 20 </y>
+  </center>
+  <apparent_size>
+   <width> 4 </width>
+	<height> 5 </height>
+  </apparent_size>
+ </image>
+</sprite>
