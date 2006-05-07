@@ -178,16 +178,12 @@ update_list = []
 bullet_list = []
 player_list = []
 
-class SimpleBullet:
+class SimpleBullet(object):
 	def __init__(self):
 		self.direction = 0
 		self.speed = 0
 		self.x = 0
 		self.y = UNIT_HEIGHT * 0.5
-
-		self.controller = BulletMLController()
-		self.controller.game_object = self
-		self.controller.set_behavior(FILE)
 
 		self.sprite = sprite.get_sprite( ENEMY_SHOT_BITMAP )
 
@@ -198,10 +194,9 @@ class SimpleBullet:
 		self.t = 0
 		self.sin_spd = random.random() * 0.04
 		
-	def fire(self, controller, direction=None, speed=None):
-		new_bullet = SimpleBullet()
-		new_bullet.controller = controller 
-		controller.set_game_object(new_bullet)
+	def fire(self, direction=None, speed=None, new_bullet=None):
+		if new_bullet is None:
+			new_bullet = SimpleBullet()
 		new_bullet.x = self.x
 		new_bullet.y = self.y
 		if direction is not None:
@@ -212,12 +207,11 @@ class SimpleBullet:
 			new_bullet.speed = speed
 		else:
 			new_bullet.speed = self.speed
-
+			
 	def update(self):
 		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
 		   self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT):
 			self.to_remove = True
-		self.controller.run()
 		self.x += math.sin(self.direction*math.pi/180)*self.speed
 		self.y -= math.cos(self.direction*math.pi/180)*self.speed
 		self.t = (self.t+self.sin_spd) % (2*math.pi)
@@ -233,6 +227,29 @@ class SimpleBullet:
 
 	def vanish(self):
 		self.to_remove = True
+
+
+class SimpleBulletML(SimpleBullet):
+	def __init__(self, bulletml_behav=None):
+		if bulletml_behav is not None:
+			self.controller = BulletMLController()
+			self.controller.game_object = self
+			self.controller.set_behavior(bulletml_behav)
+		super(SimpleBulletML, self).__init__()
+
+	def fire(self, controller, direction=None, speed=None):
+		if not controller.sub_controllers:
+			new_bullet = SimpleBullet()
+		else:
+			new_bullet = SimpleBulletML()
+			new_bullet.controller = controller
+			controller.set_game_object(new_bullet)
+		super(SimpleBulletML, self).fire(direction, speed, new_bullet)
+
+	def update(self):
+		self.controller.run()
+		super(SimpleBulletML, self).update()
+
 		
 		
 
@@ -406,8 +423,13 @@ def main():
 	vframe = 0
 	max_ob = 0
 	Player()
-	SimpleBullet()
-	while bullet_list:
+	SimpleBulletML(FILE)
+	SimpleBulletML(FILE)
+	SimpleBulletML(FILE)
+	SimpleBulletML(FILE)
+	SimpleBulletML(FILE)
+#	while bullet_list:
+	while pygame.time.get_ticks() < 80000:
 		for ev in pygame.event.get():
 			if ev.type == pygame.VIDEORESIZE:
 				set_perspective(ev.w, ev.h)
