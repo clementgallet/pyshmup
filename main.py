@@ -177,6 +177,25 @@ def init_sdl():
 update_list = []
 bullet_list = []
 player_list = []
+foe_list = []
+
+class Foe(object):
+	def __init__(self):
+		self.x = UNIT_WIDTH*0.5
+		self.y = UNIT_HEIGHT*0.8
+
+		self.sprite = sprite.get_sprite('WRONG!')
+
+		update_list.append(self)
+		foe_list.append(self)
+		self.to_remove = False
+		
+	def draw(self):
+		self.sprite.draw()
+		# TODO: if foe has no target, it becomes transparent
+
+	def update(self):
+		pass
 
 class SimpleBullet(object):
 	def __init__(self):
@@ -424,10 +443,7 @@ def main():
 	max_ob = 0
 	Player()
 	SimpleBulletML(FILE)
-	SimpleBulletML(FILE)
-	SimpleBulletML(FILE)
-	SimpleBulletML(FILE)
-	SimpleBulletML(FILE)
+	Foe()
 #	while bullet_list:
 	while pygame.time.get_ticks() < 80000:
 		for ev in pygame.event.get():
