@@ -15,7 +15,7 @@ import copy
 from OpenGL.GL import * # evil
 from OpenGL.GLU import * 
 
-import profile
+#import profile
 
 #############
 ## Constants
@@ -56,7 +56,7 @@ FILE = 'data/bullets/quad3.xml'
 #FILE = 'data/bullets/[Ikaruga]_r5_vrp.xml'
 #FILE = 'data/bullets/[Progear]_round_3_boss_back_burst.xml'
 
-OUT_LIMIT = 0.2 # out-of-screen is e.g. x > width*(1+OUT_LIMUT)
+OUT_LIMIT = 0.2 # out-of-screen is e.g. x > width*(1+OUT_LIMIT)
 
 RADIUS = 3.0 # player's "hit-disc" radius, in game units
 
