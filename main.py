@@ -229,7 +229,8 @@ class BulletMLFoe(Foe):
 		self.aim = 0
 		self.delta_x = 0
 		self.delta_y = 0
-		self.aimed_player = None
+		#FIXME: the first player is always aimed, ahahah !!
+		self.aimed_player = player_list[0]
 		self.controller = BulletMLController()
 		self.controller.game_object = self
 		self.controller.set_behavior(bulletml_behav)
@@ -242,11 +243,10 @@ class BulletMLFoe(Foe):
 			new_bullet = SimpleBulletML()
 			new_bullet.controller = controller
 			controller.set_game_object(new_bullet)
+			new_bullet.aimed_player = self.aimed_player
 		super(BulletMLFoe, self).fire(direction, speed, new_bullet)
 
 	def update(self):
-		#FIXME: the first player is always aimed, ahahah !!
-		self.aimed_player = player_list[0]
 		self.delta_x = self.aimed_player.x - self.x
 		self.delta_y = self.aimed_player.y - self.y
 		if abs(self.delta_y) < 0.000001:
@@ -317,7 +317,6 @@ class SimpleBulletML(SimpleBullet):
 		self.aim = 0
 		self.delta_x = 0
 		self.delta_y = 0
-		self.aimed_player = None
 		self.controller = BulletMLController()
 		self.controller.game_object = self
 		if bulletml_behav is not None:
@@ -331,10 +330,10 @@ class SimpleBulletML(SimpleBullet):
 			new_bullet = SimpleBulletML()
 			new_bullet.controller = controller
 			controller.set_game_object(new_bullet)
+			new_bullet.aimed_player = self.aimed_player
 		super(SimpleBulletML, self).fire(direction, speed, new_bullet)
 
 	def update(self):
-		self.aimed_player = player_list[0]
 		self.delta_x = self.aimed_player.x - self.x
 		self.delta_y = self.aimed_player.y - self.y
 		if abs(self.delta_y) < 0.000001:
