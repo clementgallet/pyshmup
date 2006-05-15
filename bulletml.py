@@ -1082,7 +1082,7 @@ def get_main_actions( name ):
 			myParser.parse(f)
 			f.close()
 		except Exception,ex:
-			l.error( "Error while parsing BulletML file : " + name )
+			l.error( "Error while parsing BulletML file : " + str(name) )
 			l.debug("Exception :" + str(ex))
 			raise
 			return namespaces["null"]['main_actions']

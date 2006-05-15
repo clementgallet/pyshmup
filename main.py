@@ -32,15 +32,16 @@ HEIGHT = 480
 
 SHIP_BITMAP = "data/images/ship.png"
 #SHIP_BITMAP = "data/images/shot_small.png"
-ENEMY_SHOT_BITMAP = "data/images/shot.png"
-#ENEMY_SHOT_BITMAP = "data/images/shot_small.png"
+BULLET_BITMAP = "data/images/shot.png"
+#BULLET_BITMAP = "data/images/shot_small.png"
+FOE_BITMAP = "data/images/foe.png"
 #FILE = "data/bullets/doud.xml"
 #FILE = "data/bullets/doud_synch.xml"
 #FILE = "data/bullets/doud_directed_rand_smooth.xml"
-FILE = "data/bullets/doud_circles.xml"
+#FILE = "data/bullets/doud_circles.xml"
 #FILE = 'data/bullets/struggle.xml'
 #FILE = 'data/bullets/bee.xml'
-#FILE = 'data/bullets/slowdown.xml'
+FILE = 'data/bullets/slowdown.xml'
 #FILE = 'data/bullets/beewinder.xml'
 #FILE = 'data/bullets/side_cracker.xml'
 #FILE = 'data/bullets/roll3pos.xml'
@@ -48,7 +49,7 @@ FILE = "data/bullets/doud_circles.xml"
 #FILE = 'data/bullets/keylie_360.xml'
 #FILE = 'data/bullets/double_roll_seeds.xml'
 #FILE = 'data/bullets/[ketsui]_r4_boss_rb_rockets.xml'
-FILE = 'data/bullets/quad3.xml'
+#FILE = 'data/bullets/quad3.xml'
 #FILE = 'data/bullets/roll.xml'
 #FILE = 'data/bullets/4waccel.xml'
 #FILE = 'data/bullets/248shot.xml'
@@ -164,7 +165,7 @@ def init_sdl():
 	set_perspective(WIDTH, HEIGHT)
 
 	glClearColor(*BACKGROUND_COLOR)
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE)#_MINUS_SRC_ALPHA)
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
 
 	glEnable(GL_TEXTURE_2D)
@@ -181,21 +182,67 @@ foe_list = []
 
 class Foe(object):
 	def __init__(self):
-		self.x = UNIT_WIDTH*0.5
-		self.y = UNIT_HEIGHT*0.8
+		self.x = UNIT_WIDTH*0
+		self.y = UNIT_HEIGHT*0.3
+		self.direction = 0
+		self.speed = 1
 
-		self.sprite = sprite.get_sprite('WRONG!')
+		self.sprite = sprite.get_sprite( FOE_BITMAP )
 
 		update_list.append(self)
 		foe_list.append(self)
 		self.to_remove = False
 		
 	def draw(self):
-		self.sprite.draw()
+		glPushMatrix()
 		# TODO: if foe has no target, it becomes transparent
+		glColor4f(1.0, 1.0, 1.0, 1.0)
+		glTranslatef(self.x, self.y, 0)
+		self.sprite.draw()
+		glPopMatrix()
+
 
 	def update(self):
-		pass
+		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
+		   self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT):
+			self.to_remove = True
+		self.x += math.sin(self.direction*math.pi/180)*self.speed
+		self.y -= math.cos(self.direction*math.pi/180)*self.speed
+
+	def fire(self, direction=None, speed=None, new_bullet=None):
+		if new_bullet is None:
+			new_bullet = SimpleBullet()
+		new_bullet.x = self.x
+		new_bullet.y = self.y
+		if direction is not None:
+			new_bullet.direction = direction
+		else:
+			new_bullet.direction = self.direction
+		if speed is not None:
+			new_bullet.speed = speed
+		else:
+			new_bullet.speed = self.speed
+
+class BulletMLFoe(Foe):
+	#FIXME: refactor this and SimpleBulletML
+	def __init__(self, bulletml_behav):
+		self.controller = BulletMLController()
+		self.controller.game_object = self
+		self.controller.set_behavior(bulletml_behav)
+		super(BulletMLFoe, self).__init__()
+
+	def fire(self, controller, direction=None, speed=None):
+		if not controller.sub_controllers:
+			new_bullet = SimpleBullet()
+		else:
+			new_bullet = SimpleBulletML()
+			new_bullet.controller = controller
+			controller.set_game_object(new_bullet)
+		super(BulletMLFoe, self).fire(direction, speed, new_bullet)
+
+	def update(self):
+		self.controller.run()
+		super(BulletMLFoe, self).update()
 
 class SimpleBullet(object):
 	def __init__(self):
@@ -204,7 +251,7 @@ class SimpleBullet(object):
 		self.x = 0
 		self.y = UNIT_HEIGHT * 0.5
 
-		self.sprite = sprite.get_sprite( ENEMY_SHOT_BITMAP )
+		self.sprite = sprite.get_sprite( BULLET_BITMAP )
 
 		update_list.append(self)
 		bullet_list.append(self)
@@ -250,9 +297,9 @@ class SimpleBullet(object):
 
 class SimpleBulletML(SimpleBullet):
 	def __init__(self, bulletml_behav=None):
+		self.controller = BulletMLController()
+		self.controller.game_object = self
 		if bulletml_behav is not None:
-			self.controller = BulletMLController()
-			self.controller.game_object = self
 			self.controller.set_behavior(bulletml_behav)
 		super(SimpleBulletML, self).__init__()
 
@@ -442,10 +489,11 @@ def main():
 	vframe = 0
 	max_ob = 0
 	Player()
-	SimpleBulletML(FILE)
-	Foe()
-#	while bullet_list:
-	while pygame.time.get_ticks() < 80000:
+#	SimpleBulletML(FILE)
+#	Foe()
+	BulletMLFoe(FILE)
+	while bullet_list or foe_list:
+#	while pygame.time.get_ticks() < 80000:
 		for ev in pygame.event.get():
 			if ev.type == pygame.VIDEORESIZE:
 				set_perspective(ev.w, ev.h)
@@ -460,7 +508,7 @@ def main():
 		for object in update_list:
 			object.update()
 			pass
-		for list in [update_list, player_list, bullet_list]:
+		for list in [update_list, player_list, bullet_list, foe_list]:
 			for object in [object for object in list if object.to_remove]:
 				list.remove(object)
 		if turn_actions >= 2:
