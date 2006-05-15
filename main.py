@@ -41,12 +41,12 @@ FOE_BITMAP = "data/images/foe.png"
 #FILE = "data/bullets/doud_circles.xml"
 #FILE = 'data/bullets/struggle.xml'
 #FILE = 'data/bullets/bee.xml'
-FILE = 'data/bullets/slowdown.xml'
+#FILE = 'data/bullets/slowdown.xml'
 #FILE = 'data/bullets/beewinder.xml'
 #FILE = 'data/bullets/side_cracker.xml'
 #FILE = 'data/bullets/roll3pos.xml'
 #FILE = 'data/bullets/rollbar.xml'
-#FILE = 'data/bullets/keylie_360.xml'
+FILE = 'data/bullets/keylie_360.xml'
 #FILE = 'data/bullets/double_roll_seeds.xml'
 #FILE = 'data/bullets/[ketsui]_r4_boss_rb_rockets.xml'
 #FILE = 'data/bullets/quad3.xml'
@@ -65,7 +65,7 @@ PLAYER_SPEED = 2.0
 
 SCALE = 400 # screen height in game units
 
-RANK = 1 # difficulty setting, 0 to 1
+RANK = 0.5 # difficulty setting, 0 to 1
 
 FPS = 60
 MAX_SKIP = 9
@@ -185,7 +185,7 @@ class Foe(object):
 		self.x = UNIT_WIDTH*0
 		self.y = UNIT_HEIGHT*0.3
 		self.direction = 0
-		self.speed = 1
+		self.speed = 0
 
 		self.sprite = sprite.get_sprite( FOE_BITMAP )
 
@@ -226,6 +226,10 @@ class Foe(object):
 class BulletMLFoe(Foe):
 	#FIXME: refactor this and SimpleBulletML
 	def __init__(self, bulletml_behav):
+		self.aim = 0
+		self.delta_x = 0
+		self.delta_y = 0
+		self.aimed_player = None
 		self.controller = BulletMLController()
 		self.controller.game_object = self
 		self.controller.set_behavior(bulletml_behav)
@@ -241,6 +245,19 @@ class BulletMLFoe(Foe):
 		super(BulletMLFoe, self).fire(direction, speed, new_bullet)
 
 	def update(self):
+		#FIXME: the first player is always aimed, ahahah !!
+		self.aimed_player = player_list[0]
+		self.delta_x = self.aimed_player.x - self.x
+		self.delta_y = self.aimed_player.y - self.y
+		if abs(self.delta_y) < 0.000001:
+			if (self.delta_x) > 0:
+				self.aim = 90
+			else:
+				self.aim = -90
+		else:
+			self.aim = math.atan(- self.delta_x / self.delta_y) * 180 / math.pi
+			if self.delta_y > 0:
+				self.aim += 180
 		self.controller.run()
 		super(BulletMLFoe, self).update()
 
@@ -297,6 +314,10 @@ class SimpleBullet(object):
 
 class SimpleBulletML(SimpleBullet):
 	def __init__(self, bulletml_behav=None):
+		self.aim = 0
+		self.delta_x = 0
+		self.delta_y = 0
+		self.aimed_player = None
 		self.controller = BulletMLController()
 		self.controller.game_object = self
 		if bulletml_behav is not None:
@@ -313,6 +334,18 @@ class SimpleBulletML(SimpleBullet):
 		super(SimpleBulletML, self).fire(direction, speed, new_bullet)
 
 	def update(self):
+		self.aimed_player = player_list[0]
+		self.delta_x = self.aimed_player.x - self.x
+		self.delta_y = self.aimed_player.y - self.y
+		if abs(self.delta_y) < 0.000001:
+			if (self.delta_x) > 0:
+				self.aim = 90
+			else:
+				self.aim = -90
+		else:
+			self.aim = math.atan(- self.delta_x / self.delta_y) * 180 / math.pi
+			if self.delta_y > 0:
+				self.aim += 180
 		self.controller.run()
 		super(SimpleBulletML, self).update()
 

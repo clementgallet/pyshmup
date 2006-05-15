@@ -11,68 +11,40 @@ xmlns="http://www.asahi-net.or.jp/~cs8k-cyu/bulletml">
          
 
 <action label="top">
-
-<repeat> <times>30</times>
-
+<repeat> <times>3000</times>
 <action>
-
+<repeat><times>20</times>
+<action>
 <fire>
-
-<direction type="sequence">360*$rand</direction>
-
-<bulletRef label="changeStraight"/>
-
+<direction type="sequence">18</direction>
+<bulletRef label="changeAim"/>
 </fire>
-
-<wait>1</wait>
-
 </action>
-
 </repeat>
-
+<wait>30</wait>
+</action>
+</repeat>
 </action>
 
 
 
-<bullet label="changeStraight">
-
+<bullet label="changeAim">
 <speed>2</speed>
-
 <action>
-
 <changeSpeed>
-
 <speed>0</speed>
-
-<term>80</term>
-
+<term>20</term>
 </changeSpeed>
-
-<wait>50</wait>
-
-<repeat> <times> 10 </times>
-
-<action>
-
-<fire>
-
-<direction type="sequence">360*$rand</direction>
-
-<bulletRef label="changeStraight"/>
-
-</fire>
-<wait>6</wait>
+<changeDirection>
+<direction type="aim">0</direction>
+<term>1</term>
+</changeDirection>
+<changeSpeed>
+<speed>2</speed>
+<term>1</term>
+</changeSpeed>
 </action>
-
-</repeat>
-
-<vanish/>
-
-</action>
-
 </bullet>
-
-
 
 </bulletml>
 
