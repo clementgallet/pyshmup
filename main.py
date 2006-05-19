@@ -30,6 +30,8 @@ FONKY_LINES = True
 WIDTH = 640
 HEIGHT = 480
 
+
+BITMAP_LOC = "data/images/"
 SHIP_BITMAP = "data/images/ship.png"
 #SHIP_BITMAP = "data/images/shot_small.png"
 BULLET_BITMAP = "data/images/shot.png"
@@ -209,7 +211,7 @@ class Foe(object):
 		self.x += math.sin(self.direction*math.pi/180)*self.speed
 		self.y -= math.cos(self.direction*math.pi/180)*self.speed
 
-	def fire(self, direction=None, speed=None, new_bullet=None):
+	def fire(self, direction=None, speed=None, new_bullet=None, shape=None):
 		if new_bullet is None:
 			new_bullet = SimpleBullet()
 		new_bullet.x = self.x
@@ -222,6 +224,9 @@ class Foe(object):
 			new_bullet.speed = speed
 		else:
 			new_bullet.speed = self.speed
+		if shape is not None:
+			new_bullet.sprite = sprite.get_sprite(BITMAP_LOC + shape + ".png" )
+
 
 class BulletMLFoe(Foe):
 	#FIXME: refactor this and SimpleBulletML
@@ -236,7 +241,7 @@ class BulletMLFoe(Foe):
 		self.controller.set_behavior(bulletml_behav)
 		super(BulletMLFoe, self).__init__()
 
-	def fire(self, controller, direction=None, speed=None):
+	def fire(self, controller, direction=None, speed=None, shape=None):
 		if not controller.sub_controllers:
 			new_bullet = SimpleBullet()
 		else:
@@ -244,7 +249,7 @@ class BulletMLFoe(Foe):
 			new_bullet.controller = controller
 			controller.set_game_object(new_bullet)
 			new_bullet.aimed_player = self.aimed_player
-		super(BulletMLFoe, self).fire(direction, speed, new_bullet)
+		super(BulletMLFoe, self).fire(direction, speed, new_bullet, shape)
 
 	def update(self):
 		self.delta_x = self.aimed_player.x - self.x
@@ -277,7 +282,7 @@ class SimpleBullet(object):
 		self.t = 0
 		self.sin_spd = random.random() * 0.04
 		
-	def fire(self, direction=None, speed=None, new_bullet=None):
+	def fire(self, direction=None, speed=None, new_bullet=None, shape=None):
 		if new_bullet is None:
 			new_bullet = SimpleBullet()
 		new_bullet.x = self.x
@@ -290,6 +295,8 @@ class SimpleBullet(object):
 			new_bullet.speed = speed
 		else:
 			new_bullet.speed = self.speed
+		if shape is not None:
+			new_bullet.sprite = sprite.get_sprite(BITMAP_LOC + shape + ".png" )
 			
 	def update(self):
 		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
@@ -323,7 +330,7 @@ class SimpleBulletML(SimpleBullet):
 			self.controller.set_behavior(bulletml_behav)
 		super(SimpleBulletML, self).__init__()
 
-	def fire(self, controller, direction=None, speed=None):
+	def fire(self, controller, direction=None, speed=None, shape=None):
 		if not controller.sub_controllers:
 			new_bullet = SimpleBullet()
 		else:
@@ -331,7 +338,7 @@ class SimpleBulletML(SimpleBullet):
 			new_bullet.controller = controller
 			controller.set_game_object(new_bullet)
 			new_bullet.aimed_player = self.aimed_player
-		super(SimpleBulletML, self).fire(direction, speed, new_bullet)
+		super(SimpleBulletML, self).fire(direction, speed, new_bullet, shape)
 
 	def update(self):
 		self.delta_x = self.aimed_player.x - self.x

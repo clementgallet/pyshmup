@@ -167,6 +167,12 @@ class Fire(Control):
 			for action in bullet.subactions:
 				main_control.add_action(action)
 
+			shape = None
+
+			try:
+				shape = self.shape
+			except AttributeError: pass	
+			
 			# arbitrary order of precedence :
 			#  bullet < fire
 			# (if that turns out to be false, swap the lines ;) )
@@ -178,6 +184,8 @@ class Fire(Control):
 			# received params. confused yet ?
 
 			# most of this code may be sent to run_first ?
+
+
 
 			NOWHERE = 0
 			BULLET = 1
@@ -227,7 +235,7 @@ class Fire(Control):
 			else:
 				main_control.params = params
 
-			main_control.game_object.fire(main_control, numeric_direction, numeric_speed)
+			main_control.game_object.fire(main_control, numeric_direction, numeric_speed, shape)
 
 			game_object_control.last_speed = numeric_speed
 			game_object_control.last_direction = numeric_direction
@@ -626,7 +634,6 @@ class Direction(Value):
 
 
 
-
 #############
 ## Builders
 
@@ -801,6 +808,10 @@ class FireBuilder(Builder):
 			self.target.label = attrs.getValue('label')
 		except KeyError:
 			pass
+		try:
+			self.target.shape = attrs.getValue('shape')
+		except KeyError:
+			pass	
 
 	def add_to_bulletml(self, bulletml_builder):
 		pass
@@ -989,7 +1000,6 @@ class ParamBuilder(FormulaBuilder):
 	add_to_actionRef = add_to_ref
 	add_to_fireRef = add_to_ref
 	add_to_bulletRef = add_to_ref
-
 
 
 
