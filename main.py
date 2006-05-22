@@ -1,7 +1,9 @@
-# LOL-*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
 import bulletml
 from bulletml import BulletMLController
+import stage
+from stage import StageController
 import sprite
 
 NO_GRAPHICS = False
@@ -30,8 +32,8 @@ FONKY_LINES = True
 WIDTH = 640
 HEIGHT = 480
 
-
-BITMAP_LOC = "data/images/"
+BITMAP_PATH = "data/images/"
+BEHAV_PATH = "data/bullets/"
 SHIP_BITMAP = "data/images/ship.png"
 #SHIP_BITMAP = "data/images/shot_small.png"
 BULLET_BITMAP = "data/images/shot.png"
@@ -190,7 +192,8 @@ class Foe(object):
 		self.speed = 0
 
 		self.sprite = sprite.get_sprite( FOE_BITMAP )
-
+		self.bullet_sprite = sprite.get_sprite( BULLET_BITMAP )
+		
 		update_list.append(self)
 		foe_list.append(self)
 		self.to_remove = False
@@ -224,8 +227,10 @@ class Foe(object):
 			new_bullet.speed = speed
 		else:
 			new_bullet.speed = self.speed
-		if shape is not None:
-			new_bullet.sprite = sprite.get_sprite(BITMAP_LOC + shape + ".png" )
+
+		new_bullet.sprite = self.bullet_sprite
+	def vanish(self):
+		self.to_remove = True
 
 
 class BulletMLFoe(Foe):
@@ -295,8 +300,9 @@ class SimpleBullet(object):
 			new_bullet.speed = speed
 		else:
 			new_bullet.speed = self.speed
-		if shape is not None:
-			new_bullet.sprite = sprite.get_sprite(BITMAP_LOC + shape + ".png" )
+
+		new_bullet.sprite = self.sprite
+
 			
 	def update(self):
 		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
@@ -495,6 +501,31 @@ class Player:
 		glPopMatrix()
 		
 
+class Stage:
+	def __init__(self):
+		self.frame = 0
+		self.control = StageController()
+		self.control.set_behavior('stage.xml')
+		self.control.game_object = self
+
+	def update(self):
+		self.control.run()
+		self.frame += 1
+
+	def launch(self,foe_controller,x,y,foe_bit,bullet_bit):
+		foe = BulletMLFoe(BEHAV_PATH + foe_controller)
+		foe.x = x
+		foe.y = y
+		if foe_bit is not None:
+			foe.sprite = sprite.get_sprite(BITMAP_PATH + foe_bit)
+		else:
+			foe.sprite = sprite.get_sprite(FOE_BITMAP)
+		if bullet_bit is not None:
+			foe.bullet_sprite = sprite.get_sprite(BITMAP_PATH + bullet_bit)
+		else:
+			foe.bullet_sprite = sprite.get_sprite(BULLET_BITMAP)
+
+		
 fskip = 0
 next_ticks = 0
 def get_turn_actions():
@@ -530,9 +561,10 @@ def main():
 	Player()
 #	SimpleBulletML(FILE)
 #	Foe()
-	BulletMLFoe(FILE)
-	while bullet_list or foe_list:
-#	while pygame.time.get_ticks() < 80000:
+#	BulletMLFoe(FILE)
+	stage = Stage()
+#	while bullet_list or foe_list:
+	while pygame.time.get_ticks() < 80000:
 		for ev in pygame.event.get():
 			if ev.type == pygame.VIDEORESIZE:
 				set_perspective(ev.w, ev.h)
@@ -544,6 +576,7 @@ def main():
 		turn_actions = get_turn_actions()
 		if len(update_list) > max_ob:
 			max_ob = len(update_list)
+		stage.update()
 		for object in update_list:
 			object.update()
 			pass
