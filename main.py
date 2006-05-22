@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+# LOL-*- coding: utf-8 -*-
 
 import bulletml
 from bulletml import BulletMLController
