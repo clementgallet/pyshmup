@@ -15,7 +15,7 @@ xmlns="http://www.asahi-net.or.jp/~cs8k-cyu/bulletml">
 <action>
 <repeat><times>20</times>
 <action>
-<fire shape="a">
+<fire>
 <direction type="sequence">18</direction>
 <bulletRef label="changeAim"/>
 </fire>
@@ -35,14 +35,12 @@ xmlns="http://www.asahi-net.or.jp/~cs8k-cyu/bulletml">
 <speed>0</speed>
 <term>20</term>
 </changeSpeed>
-<changeDirection>
+<fire>
 <direction type="aim">0</direction>
-<term>1</term>
-</changeDirection>
-<changeSpeed>
 <speed>2</speed>
-<term>1</term>
-</changeSpeed>
+<bullet/>
+</fire>
+<vanish/>
 </action>
 </bullet>
 

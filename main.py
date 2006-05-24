@@ -37,6 +37,7 @@ BEHAV_PATH = "data/bullets/"
 SHIP_BITMAP = "data/images/ship.png"
 #SHIP_BITMAP = "data/images/shot_small.png"
 BULLET_BITMAP = "data/images/shot.png"
+FAR_BULLET_BITMAP = "data/images/shot2.png"
 #BULLET_BITMAP = "data/images/shot_small.png"
 FOE_BITMAP = "data/images/foe.png"
 #FILE = "data/bullets/doud.xml"
@@ -73,6 +74,8 @@ RANK = 0.5 # difficulty setting, 0 to 1
 
 FPS = 60
 MAX_SKIP = 9
+
+WAIT_UNTIL_RECHECK = 50 # after checking if bullet is dangerous, wait WAIT_UNTIL_RECHECK frames
 
 SHOT_TIME = 40
 SHOT_FAST = 1 # in presses every SHOT_TIME frames
@@ -183,6 +186,7 @@ update_list = []
 bullet_list = []
 player_list = []
 foe_list = []
+dangerous_bullet_list = []
 
 class Foe(object):
 	def __init__(self):
@@ -214,7 +218,7 @@ class Foe(object):
 		self.x += math.sin(self.direction*math.pi/180)*self.speed
 		self.y -= math.cos(self.direction*math.pi/180)*self.speed
 
-	def fire(self, direction=None, speed=None, new_bullet=None, shape=None):
+	def fire(self, direction=None, speed=None, new_bullet=None):
 		if new_bullet is None:
 			new_bullet = SimpleBullet()
 		new_bullet.x = self.x
@@ -229,6 +233,7 @@ class Foe(object):
 			new_bullet.speed = self.speed
 
 		new_bullet.sprite = self.bullet_sprite
+
 	def vanish(self):
 		self.to_remove = True
 
@@ -238,15 +243,18 @@ class BulletMLFoe(Foe):
 	def __init__(self, bulletml_behav):
 		self.aim = 0
 		self.delta_x = 0
-		self.delta_y = 0
+		self.delta_y = 1
 		#FIXME: the first player is always aimed, ahahah !!
-		self.aimed_player = player_list[0]
+		if player_list:
+			self.aimed_player = player_list[0]
+		else:
+			self.aimed_player = None
 		self.controller = BulletMLController()
 		self.controller.game_object = self
 		self.controller.set_behavior(bulletml_behav)
 		super(BulletMLFoe, self).__init__()
 
-	def fire(self, controller, direction=None, speed=None, shape=None):
+	def fire(self, controller, direction=None, speed=None):
 		if not controller.sub_controllers:
 			new_bullet = SimpleBullet()
 		else:
@@ -254,25 +262,30 @@ class BulletMLFoe(Foe):
 			new_bullet.controller = controller
 			controller.set_game_object(new_bullet)
 			new_bullet.aimed_player = self.aimed_player
-		super(BulletMLFoe, self).fire(direction, speed, new_bullet, shape)
+		super(BulletMLFoe, self).fire(direction, speed, new_bullet)
 
 	def update(self):
-		self.delta_x = self.aimed_player.x - self.x
-		self.delta_y = self.aimed_player.y - self.y
-		if abs(self.delta_y) < 0.000001:
-			if (self.delta_x) > 0:
-				self.aim = 90
+		if self.aimed_player is not None:
+			self.delta_x = self.aimed_player.x - self.x
+			self.delta_y = self.aimed_player.y - self.y
+			if abs(self.delta_y) < 0.000001:
+				if (self.delta_x) > 0:
+					self.aim = 90
+				else:
+					self.aim = -90
 			else:
-				self.aim = -90
-		else:
-			self.aim = math.atan(- self.delta_x / self.delta_y) * 180 / math.pi
-			if self.delta_y > 0:
-				self.aim += 180
+				self.aim = math.atan(- self.delta_x / self.delta_y) * 180 / math.pi
+				if self.delta_y > 0:
+					self.aim += 180
+
 		self.controller.run()
+
 		super(BulletMLFoe, self).update()
 
 class SimpleBullet(object):
 	def __init__(self):
+		self.until = WAIT_UNTIL_RECHECK
+		self.dangerous = True
 		self.direction = 0
 		self.speed = 0
 		self.x = 0
@@ -282,12 +295,13 @@ class SimpleBullet(object):
 
 		update_list.append(self)
 		bullet_list.append(self)
+		dangerous_bullet_list.append(self)
 		self.to_remove = False
 
 		self.t = 0
 		self.sin_spd = random.random() * 0.04
 		
-	def fire(self, direction=None, speed=None, new_bullet=None, shape=None):
+	def fire(self, direction=None, speed=None, new_bullet=None):
 		if new_bullet is None:
 			new_bullet = SimpleBullet()
 		new_bullet.x = self.x
@@ -312,12 +326,75 @@ class SimpleBullet(object):
 		self.y -= math.cos(self.direction*math.pi/180)*self.speed
 		self.t = (self.t+self.sin_spd) % (2*math.pi)
 
+		if self.dangerous:
+
+			if self.until > 0:
+				self.until -= 1
+
+			else:
+			
+				dangerous_bullet_list.remove(self)
+				self.dangerous = False
+
+				for player in player_list:
+
+				
+					A = PLAYER_SPEED*(player.y - self.y)
+					B = PLAYER_SPEED*(player.x - self.x)
+					C = self.speed*((player.y - self.y)*math.sin(self.direction*math.pi/180) + (player.x - self.x)*math.cos(self.direction*math.pi/180))
+
+					# On doit resoudre maintenant l'equation Asin(theta)+Bcos(theta) = C
+
+					simp_delta = (A**2 + B**2 - C**2)
+					
+					if simp_delta >= 0:
+						# Si le player peut rencontrer la bullet, alors
+						# il faut verifier que ce ne soit pas dans les temps negatifs (je me comprends)
+						par = A * math.sqrt(simp_delta)
+						sol1 = (B*C + par)/(B**2 + A**2)
+						
+						if (-1 <= sol1 <= 1):
+							rat1 = (PLAYER_SPEED*sol1 - self.speed * math.cos(self.direction*math.pi/180))
+
+							if rat1 == 0: # Cas bizarre
+								self.dangerous = True
+								dangerous_bullet_list.append(self)
+							else:
+								t1 = (player.y - self.y)/rat1
+								if t1 > 0:
+									if -UNIT_WIDTH*(1+OUT_LIMIT) < self.x + t1*math.sin(self.direction*math.pi/180)*self.speed < UNIT_WIDTH*(1+OUT_LIMIT) and -UNIT_HEIGHT*(1+OUT_LIMIT) < self.y - t1*math.cos(self.direction*math.pi/180)*self.speed < UNIT_HEIGHT*(1+OUT_LIMIT):
+										self.until = WAIT_UNTIL_RECHECK #/(self.speed + 1)
+										self.dangerous = True
+										dangerous_bullet_list.append(self)
+						
+						if not self.dangerous:
+							sol2 = (B*C - par)/(B**2 + A**2)
+							if (-1 <= sol2 <= 1):
+								rat2 = (PLAYER_SPEED*sol2 - self.speed * math.cos(self.direction*math.pi/180))
+	
+								if rat2 == 0: # Cas bizarre
+									dangerous_bullet_list.append(self)
+									self.dangerous = True
+								else:
+									t2 = (player.y - self.y)/rat2
+									if t2 > 0:
+										if -UNIT_WIDTH*(1+OUT_LIMIT) < self.x + t2*math.sin(self.direction*math.pi/180)*self.speed < UNIT_WIDTH*(1+OUT_LIMIT) and -UNIT_HEIGHT*(1+OUT_LIMIT) < self.y - t2*math.cos(self.direction*math.pi/180)*self.speed < UNIT_HEIGHT*(1+OUT_LIMIT):
+											self.until = WAIT_UNTIL_RECHECK #/(self.speed + 1)
+											self.dangerous = True
+											dangerous_bullet_list.append(self)
+
+				
+
+					
 	def draw(self):
 		glPushMatrix()
 		glColor4f(1.0, 1.0, 1.0, 0.2)
 		glTranslatef(self.x, self.y, 0)#math.sin(self.t)*5)
-#		glRotatef(self.t * 180/math.pi, 0, 0, 1)
-		self.sprite.draw()
+		# glRotatef(self.t * 180/math.pi, 0, 0, 1)
+		if self.dangerous:
+			self.sprite.draw()
+		else:
+			sprite.get_sprite(FAR_BULLET_BITMAP).draw()
 		glPopMatrix()
 		#glTranslatef(-self.x, -self.y, 0)
 
@@ -336,7 +413,7 @@ class SimpleBulletML(SimpleBullet):
 			self.controller.set_behavior(bulletml_behav)
 		super(SimpleBulletML, self).__init__()
 
-	def fire(self, controller, direction=None, speed=None, shape=None):
+	def fire(self, controller, direction=None, speed=None):
 		if not controller.sub_controllers:
 			new_bullet = SimpleBullet()
 		else:
@@ -344,20 +421,22 @@ class SimpleBulletML(SimpleBullet):
 			new_bullet.controller = controller
 			controller.set_game_object(new_bullet)
 			new_bullet.aimed_player = self.aimed_player
-		super(SimpleBulletML, self).fire(direction, speed, new_bullet, shape)
+		super(SimpleBulletML, self).fire(direction, speed, new_bullet)
 
 	def update(self):
-		self.delta_x = self.aimed_player.x - self.x
-		self.delta_y = self.aimed_player.y - self.y
-		if abs(self.delta_y) < 0.000001:
-			if (self.delta_x) > 0:
-				self.aim = 90
+		if self.aimed_player is not None:
+			self.delta_x = self.aimed_player.x - self.x
+			self.delta_y = self.aimed_player.y - self.y
+			if abs(self.delta_y) < 0.000001:
+				if (self.delta_x) > 0:
+					self.aim = 90
+				else:
+					self.aim = -90
 			else:
-				self.aim = -90
-		else:
-			self.aim = math.atan(- self.delta_x / self.delta_y) * 180 / math.pi
-			if self.delta_y > 0:
-				self.aim += 180
+				self.aim = math.atan(- self.delta_x / self.delta_y) * 180 / math.pi
+				if self.delta_y > 0:
+					self.aim += 180
+		
 		self.controller.run()
 		super(SimpleBulletML, self).update()
 
@@ -386,8 +465,8 @@ class Player:
 		#s = ([[b.x,b.y,self.x, self.y, (b.x-self.x)**2+(b.x-self.y)**2] for b in bullet_list])# < RADIUS:
 		#random.shuffle(s)
 		#print s[0]
-		if bullet_list:
-			if min([(b.x-self.x)**2+(b.y-self.y)**2 for b in bullet_list]) < RADIUS2:
+		if dangerous_bullet_list:
+			if min([(b.x-self.x)**2+(b.y-self.y)**2 for b in dangerous_bullet_list]) < RADIUS2:
 				self.to_remove = True
 			
 		# "front montant"
@@ -564,7 +643,9 @@ def main():
 #	BulletMLFoe(FILE)
 	stage = Stage()
 #	while bullet_list or foe_list:
-	while pygame.time.get_ticks() < 80000:
+	while pygame.time.get_ticks() < 50000:
+
+		# print(str(len(dangerous_bullet_list)) + " - " + str(len(bullet_list)))
 		for ev in pygame.event.get():
 			if ev.type == pygame.VIDEORESIZE:
 				set_perspective(ev.w, ev.h)
@@ -580,7 +661,7 @@ def main():
 		for object in update_list:
 			object.update()
 			pass
-		for list in [update_list, player_list, bullet_list, foe_list]:
+		for list in [update_list, player_list, bullet_list, foe_list, dangerous_bullet_list]:
 			for object in [object for object in list if object.to_remove]:
 				list.remove(object)
 		if turn_actions >= 2:

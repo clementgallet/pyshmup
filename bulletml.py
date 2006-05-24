@@ -167,11 +167,6 @@ class Fire(Control):
 			for action in bullet.subactions:
 				main_control.add_action(action)
 
-			shape = None
-
-			try:
-				shape = self.shape
-			except AttributeError: pass	
 			
 			# arbitrary order of precedence :
 			#  bullet < fire
@@ -235,7 +230,7 @@ class Fire(Control):
 			else:
 				main_control.params = params
 
-			main_control.game_object.fire(main_control, numeric_direction, numeric_speed, shape)
+			main_control.game_object.fire(main_control, numeric_direction, numeric_speed)
 
 			game_object_control.last_speed = numeric_speed
 			game_object_control.last_direction = numeric_direction
@@ -808,10 +803,6 @@ class FireBuilder(Builder):
 			self.target.label = attrs.getValue('label')
 		except KeyError:
 			pass
-		try:
-			self.target.shape = attrs.getValue('shape')
-		except KeyError:
-			pass	
 
 	def add_to_bulletml(self, bulletml_builder):
 		pass
