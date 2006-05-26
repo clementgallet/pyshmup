@@ -1,14 +1,4 @@
-# -*- coding: utf-8 -*-
-
 import logging
-import re
-import xml.sax, xml.sax.handler
-import copy
-
-import traceback
-
-############
-## Logging
 
 if __name__ == '__main__':
 	console = logging.StreamHandler( )
@@ -17,225 +7,79 @@ if __name__ == '__main__':
 	console.setFormatter( formatter )
 	logging.getLogger('').addHandler( console )
 
-l = logging.getLogger('bulletml')
+l = logging.getLogger('stage')
 l.setLevel( logging.DEBUG )
 
-LAUNCHED = 1
+class FoeInfo:
 
-class Stage:
-	def __init__(self):
-		global namespace
-		namespace = self
-		self.foe_list = []
+    behav = None
+    x = 0
+    y = 0
+    frame = 0
+    bullet = None
+    sprite = None
 
-	def run(self,game_object_control):
-		#We suppose that the foe are sorted in the list
-		if self.foe_list:
-			while self.foe_list and self.foe_list[0].run(game_object_control) == LAUNCHED:
-				self.foe_list.remove(self.foe_list[0])
+class StagetoFoeList:
 
+    root = None
+    foe_list = None
 
-class Foe:
-	def __init__(self):
-		self.x = 0
-		self.y = 0
-		self.frame = 1
-		
-	def run(self,game_object_control):
-		if self.frame == game_object_control.game_object.frame:
-			try:
-				sprite = self.sprite
-			except:
-				sprite = None
+    def __init__(self,FILE):
 
-			try:
-				bullet = self.bullet
-			except:
-				bullet = None
-
-			game_object_control.game_object.launch(self.behav,self.x,self.y,sprite,bullet)
-			return LAUNCHED
-		else:
-			return 0
-
-##Builders
-
-target_classes = { 
-	'stage'   : Stage,
-	'foe'     : Foe,
-	}
+        self.file = FILE
+        self.readXml()
 
 
+    def readXml(self):
 
-def get_eval(text):
-	try:
-		return eval(text)
-	except:
-		l.warning(text + " is not a number in element")
-		return 0
-
-class Builder(object):
-	def __init__(self):
-		try:
-			self.target = target_classes[self.element_name]()
-		except KeyError:
-			pass # do nothing for classes that don't build a .target
+        from xml.dom.minidom import parse
+        self.doc = parse(self.file)
 
 
-	def add_to( self, builder ):
-		# $visitor calls $child.add_to_$($visitor.TYPE), passing himself as the argument on which to operate
-		try:
-			add_method=self.__getattribute__('add_to_' + builder.element_name )
-		except:
-			l.error( "Don't know what to do with %s in %s." % (self.element_name, builder.element_name) )
-			return
-		add_method( builder )
-		
+    def getRootElement(self):
 
-	def add_text( self, text ):
-		if text:
-			l.debug( "Ignoring text : " + text + " in " + self.element_name + "." )
+        if self.root == None:
+
+            self.root = self.doc.documentElement
+
+        return self.root
 
 
-class TextBuilder(Builder):
-	text = ''
-	def add_text(self, text):
-		# Quadratic, but it should not matter, really.
-		self.text += text
+    def getFoes(self):
 
+        if self.foe_list is not None:
+            return self.foe_list
 
-class StageBuilder(Builder):
-	element_name = "stage"
+        self.foe_list = []
 
+        for foe in self.getRootElement().getElementsByTagName("foe"):
 
-class FoeBuilder(Builder):
-	element_name="foe"
+            if foe.nodeType == foe.ELEMENT_NODE:
 
-	def add_to_stage(self,stage_builder):
-		stage_builder.target.foe_list.append(self.target)
+                f = FoeInfo()
 
-class BehavBuilder(TextBuilder):
-	element_name="behav"
+                try:
+                    f.behav = foe.getElementsByTagName("behav")[0].childNodes[0].nodeValue
+                except:
+                    l.warning('behavior missing')
+                try:
+                    f.x = eval(foe.getElementsByTagName("x")[0].childNodes[0].nodeValue)
+                    f.y = eval(foe.getElementsByTagName("y")[0].childNodes[0].nodeValue)
+                except:
+                    l.warning('coords missing')
+                try:
+                    f.frame = eval(foe.getElementsByTagName("frame")[0].childNodes[0].nodeValue)
+                except:
+                    l.warning('frame missing')
+                try:
+                    f.bullet = foe.getElementsByTagName("bullet")[0].childNodes[0].nodeValue
+                except:
+                    l.warning('bullet sprite missing')
+                try:
+                    f.sprite = foe.getElementsByTagName("sprite")[0].childNodes[0].nodeValue
+                except:
+                    l.warning('foe sprite missing')
 
-	def add_to_foe(self,foe_builder):
-		foe_builder.target.behav = self.text
+                self.foe_list.append(f)
 
-
-class XBuilder(TextBuilder):
-	element_name = "x"
-
-	def add_to_foe(self,foe_builder):
-		foe_builder.target.x = get_eval(self.text)
-
-
-class YBuilder(TextBuilder):
-	element_name = "y"
-
-	def add_to_foe(self,foe_builder):
-		foe_builder.target.y = get_eval(self.text)
-
-
-class BulletBuilder(TextBuilder):
-	element_name="bullet"
-
-	def add_to_foe(self,foe_builder):
-		foe_builder.target.bullet = self.text
-			
-
-class SpriteBuilder(TextBuilder):
-	element_name="sprite"
-
-	def add_to_foe(self,foe_builder):
-		foe_builder.target.sprite = self.text
-
-
-class FrameBuilder(TextBuilder):
-	element_name="frame"
-
-	def add_to_foe(self,foe_builder):
-		foe_builder.target.frame = get_eval(self.text)
-
-
-#########################
-## Parsing and Building
-
-current_object_stack = []
-
-builder_classes = {
-	'stage'           : StageBuilder,
-	'foe'             : FoeBuilder,
-	'behav'           : BehavBuilder,
-	'x'               : XBuilder,
-	'y'               : YBuilder,
-	'frame'           : FrameBuilder,
-	'bullet'          : BulletBuilder,
-	'sprite'          : SpriteBuilder,
-	}
-					 
-
-class StageHandler( xml.sax.handler.ContentHandler ):
-	def characters( self, chars ):
-		if current_object_stack:
-			current_object = current_object_stack[-1]
-			current_object.add_text( chars.strip() )
-
-	def startDocument( self ):
-		namespace = None
-
-	def endDocument( self ):
-		if namespace is None: 
-			l.warning( "No foe found" )
-
-	def startElement( self, name, attrs ):
-		if name in builder_classes:
-			builder = builder_classes[name]()
-			current_object_stack.append( builder )
-			#uilder.add_attrs(attrs) # does nothng if element doesn't like attrs
-		else:
-			l.warning( "Unknown element : " + name )
-
-	def startElementNS( self, name, qname, attrs ):
-		print name, qname, attrs
-
-	def endElement( self, name ):
-		if name in builder_classes:
-			try:
-				builder = current_object_stack.pop()
-				if current_object_stack:
-					parent_builder = current_object_stack[-1]
-					builder.add_to( parent_builder )
-			except:
-				raise
-
-#FIXME: find a slightly less moronic name
-myStageHandler = StageHandler()
-
-myParser = xml.sax.make_parser()
-myParser.setFeature(xml.sax.handler.feature_validation, False)
-myParser.setFeature(xml.sax.handler.feature_external_ges, False)
-myParser.setContentHandler(myStageHandler)
-
-
-def get_action( name ):
-	global namespace
-	try:
-		f = open( name, 'r' )
-		myParser.parse(f)
-		f.close()
-	except Exception,ex:
-		l.error( "Error while parsing Stage file : " + str(name) )
-		l.debug("Exception :" + str(ex))
-		raise
-	return copy.deepcopy(namespace)
-
-
-class StageController:
-	
-	def set_behavior( self, name ):
-		self.action = get_action(name)
-
-	def run(self):
-		self.action.run(self)
-		
-	def set_game_object(self, game_object):
-		self.game_object = game_object
+        return self.foe_list

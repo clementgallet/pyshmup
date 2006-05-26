@@ -2,9 +2,9 @@
 
 import bulletml
 from bulletml import BulletMLController
-import stage
-from stage import StageController
 import sprite
+import stage
+from stage import StagetoFoeList
 
 NO_GRAPHICS = False
 
@@ -75,7 +75,7 @@ RANK = 0.5 # difficulty setting, 0 to 1
 FPS = 60
 MAX_SKIP = 9
 
-WAIT_UNTIL_RECHECK = 50 # after checking if bullet is dangerous, wait WAIT_UNTIL_RECHECK frames
+WAIT_UNTIL_RECHECK = 30 # after checking if bullet is dangerous, wait WAIT_UNTIL_RECHECK frames
 
 SHOT_TIME = 40
 SHOT_FAST = 1 # in presses every SHOT_TIME frames
@@ -187,7 +187,7 @@ bullet_list = []
 player_list = []
 foe_list = []
 dangerous_bullet_list = []
-
+shot_list = []
 class Foe(object):
 	def __init__(self):
 		self.x = UNIT_WIDTH*0
@@ -338,47 +338,58 @@ class SimpleBullet(object):
 
 				for player in player_list:
 
-				
-					A = PLAYER_SPEED*(player.y - self.y)
-					B = PLAYER_SPEED*(player.x - self.x)
-					C = self.speed*((player.y - self.y)*math.sin(self.direction*math.pi/180) + (player.x - self.x)*math.cos(self.direction*math.pi/180))
-
+					sinv = self.speed*math.sin(self.direction*math.pi/180)
+					cosv = self.speed*math.cos(self.direction*math.pi/180)
+					
+					A = math.sqrt(2)*PLAYER_SPEED*(player.y - self.y)
+					B = math.sqrt(2)*PLAYER_SPEED*(player.x - self.x)
+					C = (player.y - self.y)*sinv + (player.x - self.x)*cosv
+					
 					# On doit resoudre maintenant l'equation Asin(theta)+Bcos(theta) = C
-
+					# Ce qui donne en posant X = sin(theta) :
+					# (A**2 + B**2)X**2 + 2*B*C*X + C**2 - B**2 = 0 (avec -1 <= X <= 1)
+					# le delta est donc : 4*B**2 (A**2 + B**2 - C**2)
+					
 					simp_delta = (A**2 + B**2 - C**2)
 					
 					if simp_delta >= 0:
 						# Si le player peut rencontrer la bullet, alors
-						# il faut verifier que ce ne soit pas dans les temps negatifs (je me comprends)
+						# il faut verifier que ce ne soit pas dans les temps negatifs
+						# c'est à dire que la collision ne soit pas dans le passé
+						
 						par = A * math.sqrt(simp_delta)
-						sol1 = (B*C + par)/(B**2 + A**2)
+
+						sol1 = (B*C + par)/(B**2 + A**2) # première solution
 						
 						if (-1 <= sol1 <= 1):
-							rat1 = (PLAYER_SPEED*sol1 - self.speed * math.cos(self.direction*math.pi/180))
+
+							rat1 = (math.sqrt(2)*PLAYER_SPEED*sol1 - cosv)
 
 							if rat1 == 0: # Cas bizarre
 								self.dangerous = True
 								dangerous_bullet_list.append(self)
 							else:
-								t1 = (player.y - self.y)/rat1
+								t1 = (player.y - self.y)/rat1 # temps de la collision (temps actuel = 0)
 								if t1 > 0:
-									if -UNIT_WIDTH*(1+OUT_LIMIT) < self.x + t1*math.sin(self.direction*math.pi/180)*self.speed < UNIT_WIDTH*(1+OUT_LIMIT) and -UNIT_HEIGHT*(1+OUT_LIMIT) < self.y - t1*math.cos(self.direction*math.pi/180)*self.speed < UNIT_HEIGHT*(1+OUT_LIMIT):
+									if -UNIT_WIDTH*(1+OUT_LIMIT) < self.x + t1*sinv < UNIT_WIDTH*(1+OUT_LIMIT) and \
+									       -UNIT_HEIGHT*(1+OUT_LIMIT) < self.y - t1*cosv < UNIT_HEIGHT*(1+OUT_LIMIT):
 										self.until = WAIT_UNTIL_RECHECK #/(self.speed + 1)
 										self.dangerous = True
 										dangerous_bullet_list.append(self)
 						
 						if not self.dangerous:
-							sol2 = (B*C - par)/(B**2 + A**2)
+							sol2 = (B*C - par)/(B**2 + A**2) # deuxieme solution
 							if (-1 <= sol2 <= 1):
-								rat2 = (PLAYER_SPEED*sol2 - self.speed * math.cos(self.direction*math.pi/180))
+								rat2 = (math.sqrt(2)*PLAYER_SPEED*sol2 - cosv)
 	
 								if rat2 == 0: # Cas bizarre
 									dangerous_bullet_list.append(self)
 									self.dangerous = True
 								else:
-									t2 = (player.y - self.y)/rat2
+									t2 = (player.y - self.y)/rat2 # temps de la collision (temps actuel = 0)
 									if t2 > 0:
-										if -UNIT_WIDTH*(1+OUT_LIMIT) < self.x + t2*math.sin(self.direction*math.pi/180)*self.speed < UNIT_WIDTH*(1+OUT_LIMIT) and -UNIT_HEIGHT*(1+OUT_LIMIT) < self.y - t2*math.cos(self.direction*math.pi/180)*self.speed < UNIT_HEIGHT*(1+OUT_LIMIT):
+										if -UNIT_WIDTH*(1+OUT_LIMIT) < self.x + t2*sinv < UNIT_WIDTH*(1+OUT_LIMIT) and \
+										       -UNIT_HEIGHT*(1+OUT_LIMIT) < self.y - t2*cosv < UNIT_HEIGHT*(1+OUT_LIMIT):
 											self.until = WAIT_UNTIL_RECHECK #/(self.speed + 1)
 											self.dangerous = True
 											dangerous_bullet_list.append(self)
@@ -443,6 +454,47 @@ class SimpleBulletML(SimpleBullet):
 		
 		
 
+SHOT_IN_SPEED = 4
+SHOT_OUT_SPEED = 10
+SHOT_IN_WIDTH = 5
+SHOT_OUT_WIDTH = 20
+SHOT_SPIN = 20
+
+class Shot:
+
+	x = 0
+	y = 0
+	frame = 0
+	initial_x = 0
+	width = 10
+	speed = SHOT_IN_SPEED
+	def __init__(self):
+		self.sprite = sprite.get_sprite( BULLET_BITMAP )
+		shot_list.append(self)
+		update_list.append(self)
+		self.to_remove = False
+
+		
+	def update(self):
+		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
+		   self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT):
+			self.to_remove = True
+		self.y += self.speed
+		self.x = math.cos(float(self.frame)*math.pi/(2*SHOT_SPIN))*self.width + self.initial_x
+
+	def draw(self):
+		glPushMatrix()
+		glColor4f(1.0, 1.0, 1.0, 0.2)
+		glTranslatef(self.x, self.y, 0)#math.sin(self.t)*5)
+		# glRotatef(self.t * 180/math.pi, 0, 0, 1)
+		self.sprite.draw()
+		glPopMatrix()
+		#glTranslatef(-self.x, -self.y, 0)
+
+	def vanish(self):
+		self.to_remove = True
+
+
 SHOT_NO = 0
 SHOT_LOW = 1
 SHOT_HIGH = 5
@@ -462,69 +514,106 @@ class Player:
 			dy -= 1
 		self.x += dx*PLAYER_SPEED
 		self.y += dy*PLAYER_SPEED
+		self.frame += 1
 		#s = ([[b.x,b.y,self.x, self.y, (b.x-self.x)**2+(b.x-self.y)**2] for b in bullet_list])# < RADIUS:
 		#random.shuffle(s)
 		#print s[0]
 		if dangerous_bullet_list:
 			if min([(b.x-self.x)**2+(b.y-self.y)**2 for b in dangerous_bullet_list]) < RADIUS2:
 				self.to_remove = True
+
+
+		if keys[KEY_SHOT]:
+			shot = Shot()
+			shot.initial_x = self.x
+			shot.y = self.y
+			shot.frame = self.frame
+			shot.width = SHOT_IN_WIDTH
+			shot.speed = SHOT_IN_SPEED
+			shot.x = math.cos(float(shot.frame)*math.pi/SHOT_SPIN)*shot.width + shot.initial_x
+				
+			shot = Shot()
+			shot.initial_x = self.x
+			shot.y = self.y
+			shot.frame = self.frame + 2*SHOT_SPIN
+			shot.speed = SHOT_IN_SPEED
+			shot.width = SHOT_IN_WIDTH
+			shot.x = math.cos(float(shot.frame)*math.pi/SHOT_SPIN)*shot.width + shot.initial_x
 			
+			shot = Shot()
+			shot.initial_x = self.x
+			shot.y = self.y
+			shot.frame = self.frame + SHOT_SPIN
+			shot.width = SHOT_OUT_WIDTH
+			shot.speed = SHOT_OUT_SPEED
+			shot.x = math.cos(float(shot.frame)*math.pi/SHOT_SPIN)*shot.width + shot.initial_x
+
+			shot = Shot()
+			shot.initial_x = self.x
+			shot.y = self.y
+			shot.frame = self.frame + 3*SHOT_SPIN
+			shot.width = SHOT_OUT_WIDTH
+			shot.speed = SHOT_OUT_SPEED
+			shot.x = math.cos(float(shot.frame)*math.pi/SHOT_SPIN)*shot.width + shot.initial_x
+
+				
 		# "front montant"
-		shot_pressed = (not self.last_shot_pressed) and keys[KEY_SHOT]
-		self.last_shot_pressed = keys[KEY_SHOT]
+		#shot_pressed = (not self.last_shot_pressed) and keys[KEY_SHOT]
+		#self.last_shot_pressed = keys[KEY_SHOT]
 		
 		# find shot_state
-		if self.shot_state == 0:
-			if shot_pressed:
-				self.to_next_shot_limit = SHOT_TIME
-				self.shot_count = 0
-				self.last_shot_state = 0
-				self.shot_state = 1
-		else:
-			if self.to_next_shot_limit <= 0:
-				# we have to decide the next firepower
-				if self.shot_count >= self.shot_state:
-					self.last_shot_state = self.shot_state
-					if self.shot_state < SHOT_HIGH:
-						self.shot_state += 1
-				elif self.shot_count > 0:
-					# statu quo
-					self.last_shot_state = self.shot_state
-				else:
-					if self.last_shot_state >= self.shot_state:
-						self.last_shot_state = self.shot_state
-						if self.shot_state > 1:
-							self.shot_state -= 1
-						else:
-							if self.shot_count > 0:
-								self.last_shot_state = 1 # staying in LOW anyway
-							else:
-								self.shot_state = SHOT_NO
-					else:
-						self.last_shot_state = self.shot_state
-				self.to_next_shot_limit = SHOT_TIME
-				self.shot_count = 0
-				if shot_pressed:
-					self.shot_count = 1
-			else:
-				if shot_pressed:
-					self.shot_count += 1
-				self.to_next_shot_limit -= 1
+		# if self.shot_state == 0:
+		#	if shot_pressed:
+		#		self.to_next_shot_limit = SHOT_TIME
+		#		self.shot_count = 0
+		#		self.last_shot_state = 0
+		#		self.shot_state = 1
+		#else:
+		#	if self.to_next_shot_limit <= 0:
+		#		# we have to decide the next firepower
+		#		if self.shot_count >= self.shot_state:
+		#			self.last_shot_state = self.shot_state
+		#			if self.shot_state < SHOT_HIGH:
+		#				self.shot_state += 1
+		#		elif self.shot_count > 0:
+		#			# statu quo
+		#			self.last_shot_state = self.shot_state
+		#		else:
+		#			if self.last_shot_state >= self.shot_state:
+		#				self.last_shot_state = self.shot_state
+		#				if self.shot_state > 1:
+		#					self.shot_state -= 1
+		#				else:
+		#					if self.shot_count > 0:
+		#						self.last_shot_state = 1 # staying in LOW anyway
+		#					else:
+		#						self.shot_state = SHOT_NO
+		#			else:
+		#				self.last_shot_state = self.shot_state
+		#		self.to_next_shot_limit = SHOT_TIME
+		#		self.shot_count = 0
+		#		if shot_pressed:
+		#			self.shot_count = 1
+		#	else:
+		#		if shot_pressed:
+		#			self.shot_count += 1
+		#		self.to_next_shot_limit -= 1
 
 		#print "state ", self.shot_state, " for ", self.to_next_shot_limit, " (", self.shot_count, ") [", \
 		#	shot_pressed, "]"
-		global BACKGROUND_COLOR
-#		BACKGROUND_COLOR = ( 50* self.shot_state, 50* self.shot_state, 50* self.shot_state )
+		#global BACKGROUND_COLOR
+#		#BACKGROUND_COLOR = ( 50* self.shot_state, 50* self.shot_state, 50* self.shot_state )
 
 		#TODO: show it !
 					
-				
+	
 			
 
 	def __init__(self):
 		self.x = 0.0
 		self.y = -UNIT_HEIGHT * .5
 		self.to_remove = False
+		self.frame = 0
 		update_list.append(self)
 		player_list.append(self)
 
@@ -582,13 +671,16 @@ class Player:
 
 class Stage:
 	def __init__(self):
+		self.foe_list = copy.deepcopy(StagetoFoeList('stage.xml').getFoes())
 		self.frame = 0
-		self.control = StageController()
-		self.control.set_behavior('stage.xml')
-		self.control.game_object = self
 
 	def update(self):
-		self.control.run()
+		# print(str(self.foe_list[0].frame) + ' | ' + str(self.frame))
+		while (self.foe_list and self.foe_list[0].frame == self.frame):
+			# print('launch')
+			foe = self.foe_list[0]
+			self.launch(foe.behav,foe.x,foe.y,foe.sprite,foe.bullet)
+			self.foe_list.remove(foe)
 		self.frame += 1
 
 	def launch(self,foe_controller,x,y,foe_bit,bullet_bit):
@@ -661,7 +753,7 @@ def main():
 		for object in update_list:
 			object.update()
 			pass
-		for list in [update_list, player_list, bullet_list, foe_list, dangerous_bullet_list]:
+		for list in [update_list, player_list, bullet_list, foe_list, dangerous_bullet_list, shot_list]:
 			for object in [object for object in list if object.to_remove]:
 				list.remove(object)
 		if turn_actions >= 2:
