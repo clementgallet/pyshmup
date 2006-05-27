@@ -112,7 +112,7 @@ l.setLevel(logging.DEBUG)
 
 def set_perspective(width, height):
 	global screen
-	screen = pygame.display.set_mode( (width, height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE )
+	screen = pygame.display.set_mode( (width, height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE | pygame.FULLSCREEN )
 
 	glViewport(0, 0, width, height)
 
@@ -334,65 +334,82 @@ class SimpleBullet(object):
 			else:
 			
 				dangerous_bullet_list.remove(self)
-				self.dangerous = False
-
+				self.dangerous = False 
+				
 				for player in player_list:
 
-					sinv = self.speed*math.sin(self.direction*math.pi/180)
-					cosv = self.speed*math.cos(self.direction*math.pi/180)
+					if self.dangerous:
+						break
+	
+					signe_x = ((self.x - player.x > 0) * 2) - 1
+					rat_x = math.sin(self.direction*math.pi/180)*self.speed - signe_x * PLAYER_SPEED
+					if rat_x != 0:
+						t_x = (signe_x * RADIUS - self.x + player.x) / rat_x
+						if t_x > 0 and - UNIT_WIDTH < player.x + signe_x * t_x * PLAYER_SPEED < UNIT_WIDTH:
+							signe_y = ((self.y - player.y > 0) * 2) - 1
+                                        		rat_y = -math.cos(self.direction*math.pi/180)*self.speed - signe_y * PLAYER_SPEED
+                                        		if rat_y != 0:	
+                                                		t_y = (signe_y * RADIUS - self.y + player.y) / rat_y
+                                                		if t_y > 0 and - UNIT_HEIGHT < player.y + signe_y * t_y * PLAYER_SPEED < UNIT_HEIGHT:
+									self.dangerous = True
+									dangerous_bullet_list.append(self)
+									self.until = max (t_x, t_y)
+
+				#	sinv = self.speed*math.sin(self.direction*math.pi/180)
+				#	cosv = self.speed*math.cos(self.direction*math.pi/180)
 					
-					A = math.sqrt(2)*PLAYER_SPEED*(player.y - self.y)
-					B = math.sqrt(2)*PLAYER_SPEED*(player.x - self.x)
-					C = (player.y - self.y)*sinv + (player.x - self.x)*cosv
+				#	A = math.sqrt(2)*PLAYER_SPEED*(player.y - self.y)
+				#	B = math.sqrt(2)*PLAYER_SPEED*(player.x - self.x)
+				#	C = (player.y - self.y)*sinv + (player.x - self.x)*cosv
 					
 					# On doit resoudre maintenant l'equation Asin(theta)+Bcos(theta) = C
 					# Ce qui donne en posant X = sin(theta) :
 					# (A**2 + B**2)X**2 + 2*B*C*X + C**2 - B**2 = 0 (avec -1 <= X <= 1)
 					# le delta est donc : 4*B**2 (A**2 + B**2 - C**2)
 					
-					simp_delta = (A**2 + B**2 - C**2)
+				#	simp_delta = (A**2 + B**2 - C**2)
 					
-					if simp_delta >= 0:
+				#	if simp_delta >= 0:
 						# Si le player peut rencontrer la bullet, alors
 						# il faut verifier que ce ne soit pas dans les temps negatifs
 						# c'est à dire que la collision ne soit pas dans le passé
 						
-						par = A * math.sqrt(simp_delta)
+				#		par = A * math.sqrt(simp_delta)
 
-						sol1 = (B*C + par)/(B**2 + A**2) # première solution
+				#		sol1 = (B*C + par)/(B**2 + A**2) # première solution
 						
-						if (-1 <= sol1 <= 1):
+				#		if (-1 <= sol1 <= 1):
 
-							rat1 = (math.sqrt(2)*PLAYER_SPEED*sol1 - cosv)
+				#			rat1 = (math.sqrt(2)*PLAYER_SPEED*sol1 - cosv)
 
-							if rat1 == 0: # Cas bizarre
-								self.dangerous = True
-								dangerous_bullet_list.append(self)
-							else:
-								t1 = (player.y - self.y)/rat1 # temps de la collision (temps actuel = 0)
-								if t1 > 0:
-									if -UNIT_WIDTH*(1+OUT_LIMIT) < self.x + t1*sinv < UNIT_WIDTH*(1+OUT_LIMIT) and \
-									       -UNIT_HEIGHT*(1+OUT_LIMIT) < self.y - t1*cosv < UNIT_HEIGHT*(1+OUT_LIMIT):
-										self.until = WAIT_UNTIL_RECHECK #/(self.speed + 1)
-										self.dangerous = True
-										dangerous_bullet_list.append(self)
+				#			if rat1 == 0: # Cas bizarre
+				#				self.dangerous = True
+				#				dangerous_bullet_list.append(self)
+				#			else:
+				#				t1 = (player.y - self.y)/rat1 # temps de la collision (temps actuel = 0)
+				#				if t1 > 0:
+				#					if -UNIT_WIDTH*(1+OUT_LIMIT) < self.x + t1*sinv < UNIT_WIDTH*(1+OUT_LIMIT) and \
+				#					       -UNIT_HEIGHT*(1+OUT_LIMIT) < self.y - t1*cosv < UNIT_HEIGHT*(1+OUT_LIMIT):
+				#						self.until = WAIT_UNTIL_RECHECK #/(self.speed + 1)
+				#						self.dangerous = True
+				#						dangerous_bullet_list.append(self)
 						
-						if not self.dangerous:
-							sol2 = (B*C - par)/(B**2 + A**2) # deuxieme solution
-							if (-1 <= sol2 <= 1):
-								rat2 = (math.sqrt(2)*PLAYER_SPEED*sol2 - cosv)
+				#		if not self.dangerous:
+				#			sol2 = (B*C - par)/(B**2 + A**2) # deuxieme solution
+				#			if (-1 <= sol2 <= 1):
+				#				rat2 = (math.sqrt(2)*PLAYER_SPEED*sol2 - cosv)
 	
-								if rat2 == 0: # Cas bizarre
-									dangerous_bullet_list.append(self)
-									self.dangerous = True
-								else:
-									t2 = (player.y - self.y)/rat2 # temps de la collision (temps actuel = 0)
-									if t2 > 0:
-										if -UNIT_WIDTH*(1+OUT_LIMIT) < self.x + t2*sinv < UNIT_WIDTH*(1+OUT_LIMIT) and \
-										       -UNIT_HEIGHT*(1+OUT_LIMIT) < self.y - t2*cosv < UNIT_HEIGHT*(1+OUT_LIMIT):
-											self.until = WAIT_UNTIL_RECHECK #/(self.speed + 1)
-											self.dangerous = True
-											dangerous_bullet_list.append(self)
+				#				if rat2 == 0: # Cas bizarre
+				#					dangerous_bullet_list.append(self)
+				#					self.dangerous = True
+				#				else:
+				#					t2 = (player.y - self.y)/rat2 # temps de la collision (temps actuel = 0)
+				#					if t2 > 0:
+				#						if -UNIT_WIDTH*(1+OUT_LIMIT) < self.x + t2*sinv < UNIT_WIDTH*(1+OUT_LIMIT) and \
+				#						       -UNIT_HEIGHT*(1+OUT_LIMIT) < self.y - t2*cosv < UNIT_HEIGHT*(1+OUT_LIMIT):
+				#							self.until = WAIT_UNTIL_RECHECK #/(self.speed + 1)
+				#							self.dangerous = True
+				#							dangerous_bullet_list.append(self)
 
 				
 
