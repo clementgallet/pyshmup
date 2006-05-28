@@ -1,13 +1,5 @@
 <stage>
 <foe>
-<behav>roll3pos.xml</behav>
-<x>0</x>
-<y>0</y>
-<frame>0</frame>
-<bullet>shot.png</bullet>
-<sprite>foe.png</sprite>
-</foe>
-<foe>
 <behav>keylie_360.xml</behav>
 <x>0</x>
 <y>150</y>

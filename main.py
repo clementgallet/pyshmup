@@ -16,6 +16,7 @@ import random
 import copy
 from OpenGL.GL import * # evil
 from OpenGL.GLU import * 
+from Numeric import *
 
 #import profile
 
@@ -27,7 +28,7 @@ KEY_SHOT = pygame.K_q
 
 DRAW_HITBOX = True
 
-FONKY_LINES = False
+FONKY_LINES = True
 
 WIDTH = 640
 HEIGHT = 480
@@ -81,6 +82,9 @@ SHOT_TIME = 40
 SHOT_FAST = 1 # in presses every SHOT_TIME frames
 
 BACKGROUND_COLOR = (.235, .275, .275, 1)
+
+SINUS_LIST = [math.sin(i*math.pi / 1800) for i in range(3601)]
+COSINUS_LIST = [math.cos(i*math.pi / 1800) for i in range(3601)]
 
 #####################
 ## Derived constants
@@ -179,15 +183,19 @@ def init_sdl():
 
 	pygame.display.set_caption("FIVE TONS OF FLAX !")
 	
-		
-																						
+#############
+## Fonctions
+
+
 # this is not intended to be particularly exten{ded,sible}
 update_list = []
 bullet_list = []
 player_list = []
 foe_list = []
 shot_list = []
-
+bullet_array = zeros((4,32),Float)
+array_fill = 0
+array_size = 32
 
 class Foe(object):
 	def __init__(self):
@@ -195,7 +203,7 @@ class Foe(object):
 		self.y = UNIT_HEIGHT*0.3
 		self.direction = 0
 		self.speed = 0
-
+		self.to_remove = False
 		self.sprite = sprite.get_sprite( FOE_BITMAP )
 		self.bullet_sprite = sprite.get_sprite( BULLET_BITMAP )
 		
@@ -212,12 +220,15 @@ class Foe(object):
 
 
 	def update(self):
+		self.direction = self.direction % 360
 		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
 		   self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT):
-			update_list.remove(self)
 			foe_list.remove(self)
-		self.x += math.sin(self.direction*math.pi/180)*self.speed
-		self.y -= math.cos(self.direction*math.pi/180)*self.speed
+			self.to_remove = True
+		self.x += SINUS_LIST[int(10*self.direction)]*self.speed
+		self.y -= COSINUS_LIST[int(10*self.direction)]*self.speed
+
+		return self
 
 	def fire(self, direction=None, speed=None, new_bullet=None):
 		if new_bullet is None:
@@ -233,12 +244,16 @@ class Foe(object):
 		else:
 			new_bullet.speed = self.speed
 
+		bullet_array[0,new_bullet.index] = new_bullet.x
+		bullet_array[1,new_bullet.index] = new_bullet.y
+		bullet_array[2,new_bullet.index] = new_bullet.direction
+		bullet_array[3,new_bullet.index] = new_bullet.speed
+
 		new_bullet.sprite = self.bullet_sprite
 
 	def vanish(self):
-		update_list.remove(self)
 		foe_list.remove(self)
-
+		self.to_remove = True
 
 class BulletMLFoe(Foe):
 	#FIXME: refactor this and SimpleBulletML
@@ -266,6 +281,7 @@ class BulletMLFoe(Foe):
 			new_bullet.aimed_player = self.aimed_player
 		super(BulletMLFoe, self).fire(direction, speed, new_bullet)
 
+
 	def update(self):
 		if self.aimed_player is not None:
 			self.delta_x = self.aimed_player.x - self.x
@@ -282,28 +298,44 @@ class BulletMLFoe(Foe):
 
 		self.controller.run()
 
-		super(BulletMLFoe, self).update()
+		return super(BulletMLFoe, self).update()
 
 
 class SimpleBullet(object):
 	def __init__(self):
+		global bullet_array,array_size,array_fill
 		self.until = 0
 		self.dangerous = True
 		self.direction = 0
-		self.speed = 0
+		self.speed = 1
 		self.x = 0
 		self.y = UNIT_HEIGHT * 0.5
-
+		#print(array_fill)
+		#print(len(bullet_list))
+		self.index = array_fill
+		array_fill += 1
+		#bullet_array[0,self.index] = self.x
+		#bullet_array[1,self.index] = self.y
+		#bullet_array[2,self.index] = self.direction
+		#bullet_array[3,self.index] = self.speed
+		if array_fill == array_size:
+			array_size *= 2
+			bullet_array = resize(bullet_array,(4,array_size))
+		
+		self.to_remove = False
+		
 		self.sprite_not_dangerous = sprite.get_sprite( BULLET_NOT_BITMAP )
 		self.sprite = sprite.get_sprite (BULLET_BITMAP)
 		update_list.append(self)
 		bullet_list.append(self)
-
+		#print(self.index)
+		#print(bullet_list.index(self))
 		self.t = 0
 		self.sin_spd = random.random() * 0.04
 		
 	def fire(self, direction=None, speed=None, new_bullet=None):
 		if new_bullet is None:
+			print ('strange...')
 			new_bullet = SimpleBullet()
 		new_bullet.x = self.x
 		new_bullet.y = self.y
@@ -316,16 +348,29 @@ class SimpleBullet(object):
 		else:
 			new_bullet.speed = self.speed
 
+		#self.index = bullet_list.index(self)
+		bullet_array[0,new_bullet.index] = new_bullet.x
+		bullet_array[1,new_bullet.index] = new_bullet.y
+		bullet_array[2,new_bullet.index] = new_bullet.direction
+		bullet_array[3,new_bullet.index] = new_bullet.speed
+
+		#print('index : ' + str(new_bullet.index) + ' - index dans la liste : ' + str(bullet_list.index(self)))
 		new_bullet.sprite = self.sprite
 
 			
 	def update(self):
+		
+		self.x = bullet_array[0,self.index]
+		self.y = bullet_array[1,self.index]
+		self.direction = bullet_array[2,self.index] % 360
+		self.speed = bullet_array[3,self.index]
+
 		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
 		   self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT):
-			update_list.remove(self)
-			bullet_list.remove(self)
-		self.x += math.sin(self.direction*math.pi/180)*self.speed
-		self.y -= math.cos(self.direction*math.pi/180)*self.speed
+			self.vanish()
+			
+		#self.x += SINUS_LIST[int(10*self.direction)]*self.speed
+		#self.y -= COSINUS_LIST[int(10*self.direction)]*self.speed
 		self.t = (self.t+self.sin_spd) % (2*math.pi)
 
 
@@ -341,21 +386,15 @@ class SimpleBullet(object):
 				
 					if abs(self.x - player.x) > RADIUS:
 						signe_x = (self.x > player.x) + (self.x >= player.x ) - 1
-						# print('signe_x = ' + str(signe_x))
-						rat_x = math.sin(self.direction*math.pi/180)*self.speed - signe_x * PLAYER_SPEED
-						# print('rat_x = ' + str(rat_x))
+						rat_x = SINUS_LIST[int(10*self.direction)]*self.speed - signe_x * PLAYER_SPEED
 						if rat_x != 0:
 							t_x = (signe_x * RADIUS - self.x + player.x) / rat_x
-							# print('t_x = ' + str(t_x))
 							if t_x >= 0 and - UNIT_WIDTH < player.x + signe_x * t_x * PLAYER_SPEED < UNIT_WIDTH:
 								if abs(self.y - player.y) > RADIUS:
 									signe_y = (self.y > player.y) + (self.y >= player.y) - 1
-									# print('signe_y = ' + str(signe_y))
-									rat_y = -math.cos(self.direction*math.pi/180)*self.speed - signe_y * PLAYER_SPEED
-									# print('rat_y = ' + str(rat_y))
+									rat_y = -COSINUS_LIST[int(10*self.direction)]*self.speed - signe_y * PLAYER_SPEED
 									if rat_y != 0:	
 										t_y = (signe_y * RADIUS - self.y + player.y) / rat_y
-										# print('t_y = ' + str(t_y))
 										if t_y >= 0:
 											self.dangerous = True
 											self.until = int(max (t_x, t_y))
@@ -367,80 +406,19 @@ class SimpleBullet(object):
 					else:
 						if abs(self.y - player.y) > RADIUS:
 							signe_y = (self.y > player.y) + (self.y >= player.y) - 1
-							# print('signe_y = ' + str(signe_y))
-							rat_y = -math.cos(self.direction*math.pi/180)*self.speed - signe_y * PLAYER_SPEED
-							# print('rat_y = ' + str(rat_y))
+							rat_y = -COSINUS_LIST[int(10*self.direction)]*self.speed - signe_y * PLAYER_SPEED
 							if rat_y != 0:
 								t_y = (signe_y * RADIUS - self.y + player.y) / rat_y
-								# print('t_y = ' + str(t_y))
 								if t_y >= 0:
 									self.dangerous = True
 									self.until = int(t_y)
 
 						else:
-							update_list.remove(self)
-							update_list.remove(player)
-							bullet_list.remove(self)
 							player_list.remove(player)
+							player.to_remove = True
+							self.vanish()
 
-
-					#	sinv = self.speed*math.sin(self.direction*math.pi/180)
-				#	cosv = self.speed*math.cos(self.direction*math.pi/180)
-					
-				#	A = math.sqrt(2)*PLAYER_SPEED*(player.y - self.y)
-				#	B = math.sqrt(2)*PLAYER_SPEED*(player.x - self.x)
-				#	C = (player.y - self.y)*sinv + (player.x - self.x)*cosv
-					
-					# On doit resoudre maintenant l'equation Asin(theta)+Bcos(theta) = C
-					# Ce qui donne en posant X = sin(theta) :
-					# (A**2 + B**2)X**2 + 2*B*C*X + C**2 - B**2 = 0 (avec -1 <= X <= 1)
-					# le delta est donc : 4*B**2 (A**2 + B**2 - C**2)
-					
-				#	simp_delta = (A**2 + B**2 - C**2)
-					
-				#	if simp_delta >= 0:
-						# Si le player peut rencontrer la bullet, alors
-						# il faut verifier que ce ne soit pas dans les temps negatifs
-						# c'est à dire que la collision ne soit pas dans le passé
-						
-				#		par = A * math.sqrt(simp_delta)
-
-				#		sol1 = (B*C + par)/(B**2 + A**2) # première solution
-						
-				#		if (-1 <= sol1 <= 1):
-
-				#			rat1 = (math.sqrt(2)*PLAYER_SPEED*sol1 - cosv)
-
-				#			if rat1 == 0: # Cas bizarre
-				#				self.dangerous = True
-				#				dangerous_bullet_list.append(self)
-				#			else:
-				#				t1 = (player.y - self.y)/rat1 # temps de la collision (temps actuel = 0)
-				#				if t1 > 0:
-				#					if -UNIT_WIDTH*(1+OUT_LIMIT) < self.x + t1*sinv < UNIT_WIDTH*(1+OUT_LIMIT) and \
-				#					       -UNIT_HEIGHT*(1+OUT_LIMIT) < self.y - t1*cosv < UNIT_HEIGHT*(1+OUT_LIMIT):
-				#						self.until = WAIT_UNTIL_RECHECK #/(self.speed + 1)
-				#						self.dangerous = True
-				#						dangerous_bullet_list.append(self)
-						
-				#		if not self.dangerous:
-				#			sol2 = (B*C - par)/(B**2 + A**2) # deuxieme solution
-				#			if (-1 <= sol2 <= 1):
-				#				rat2 = (math.sqrt(2)*PLAYER_SPEED*sol2 - cosv)
-	
-				#				if rat2 == 0: # Cas bizarre
-				#					dangerous_bullet_list.append(self)
-				#					self.dangerous = True
-				#				else:
-				#					t2 = (player.y - self.y)/rat2 # temps de la collision (temps actuel = 0)
-				#					if t2 > 0:
-				#						if -UNIT_WIDTH*(1+OUT_LIMIT) < self.x + t2*sinv < UNIT_WIDTH*(1+OUT_LIMIT) and \
-				#						       -UNIT_HEIGHT*(1+OUT_LIMIT) < self.y - t2*cosv < UNIT_HEIGHT*(1+OUT_LIMIT):
-				#							self.until = WAIT_UNTIL_RECHECK #/(self.speed + 1)
-				#							self.dangerous = True
-				#							dangerous_bullet_list.append(self)
-
-				
+		return self
 
 					
 	def draw(self):
@@ -456,9 +434,19 @@ class SimpleBullet(object):
 		#glTranslatef(-self.x, -self.y, 0)
 
 	def vanish(self):
-		update_list.remove(self)
-		bullet_list.remove(self)
-
+		#print (str(self.index) + ' - ' + str(bullet_list.index(self)))
+		#print ('taille array :' + str(array_fill) + ' - taille liste : ' + str(len(bullet_list)) + ' - index elem : ' + str(self.index))
+		global array_fill
+		self.to_remove = True
+		array_fill -= 1
+		if array_fill == self.index:
+			bullet_list.pop()
+		else:
+			bullet_array[:,self.index] = bullet_array[:,array_fill]
+			bullet_list[array_fill].index = self.index
+			bullet_list[self.index] = bullet_list.pop()
+		#print (self.index)
+		#print (bullet_list[self.index].index)
 
 class SimpleBulletML(SimpleBullet):
 	def __init__(self, bulletml_behav=None):
@@ -482,6 +470,9 @@ class SimpleBulletML(SimpleBullet):
 		super(SimpleBulletML, self).fire(direction, speed, new_bullet)
 
 	def update(self):
+		self.x = bullet_array[0,self.index]
+		self.y = bullet_array[1,self.index]
+
 		if self.aimed_player is not None:
 			self.delta_x = self.aimed_player.x - self.x
 			self.delta_y = self.aimed_player.y - self.y
@@ -496,8 +487,12 @@ class SimpleBulletML(SimpleBullet):
 					self.aim += 180
 		
 		self.controller.run()
-		super(SimpleBulletML, self).update()
 
+		bullet_array[2,self.index] = self.direction % 360
+		bullet_array[3,self.index] = self.speed
+
+		return super(SimpleBulletML, self).update()
+		
 		
 		
 
@@ -519,15 +514,18 @@ class Shot:
 		self.sprite = sprite.get_sprite( BULLET_BITMAP )
 		shot_list.append(self)
 		update_list.append(self)
+		self.to_remove = False
 		
 	def update(self):
 		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
 		   self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT):
-			update_list.remove(self)
 			shot_bullet.remove(self)
+			self.to_remove = True
 		self.y += self.speed
 		self.x = math.cos(float(self.frame)*math.pi/(2*SHOT_SPIN))*self.width + self.initial_x
 
+		return self
+	
 	def draw(self):
 		glPushMatrix()
 		glColor4f(1.0, 1.0, 1.0, 0.2)
@@ -538,8 +536,8 @@ class Shot:
 		#glTranslatef(-self.x, -self.y, 0)
 
 	def vanish(self):
-		update_list.remove(self)
 		shot_list.remove(self)
+		self.to_remove = True
 
 
 SHOT_NO = 0
@@ -568,7 +566,6 @@ class Player:
 		#if dangerous_bullet_list:
 		#	if min([(b.x-self.x)**2+(b.y-self.y)**2 for b in dangerous_bullet_list]) < RADIUS2:
 		#		self.to_remove = True
-
 
 		if keys[KEY_SHOT]:
 			shot = Shot()
@@ -603,7 +600,7 @@ class Player:
 			shot.speed = SHOT_OUT_SPEED
 			shot.x = math.cos(float(shot.frame)*math.pi/SHOT_SPIN)*shot.width + shot.initial_x
 
-				
+		return self
 		# "front montant"
 		#shot_pressed = (not self.last_shot_pressed) and keys[KEY_SHOT]
 		#self.last_shot_pressed = keys[KEY_SHOT]
@@ -652,9 +649,7 @@ class Player:
 #		#BACKGROUND_COLOR = ( 50* self.shot_state, 50* self.shot_state, 50* self.shot_state )
 
 		#TODO: show it !
-					
-	
-			
+								
 
 	def __init__(self):
 		self.x = 0.0
@@ -662,7 +657,7 @@ class Player:
 		self.frame = 0
 		update_list.append(self)
 		player_list.append(self)
-
+		self.to_remove = False
 		self.shot_state = SHOT_NO
 		self.to_next_shot_limit = 0
 		self.last_shot_pressed = False
@@ -769,7 +764,7 @@ def get_turn_actions():
 
 skip_c = 0
 def main():
-	global bullet_list
+	global update_list,bullet_list
 	init_sdl()
 	x=0
 	first_ticks = pygame.time.get_ticks()
@@ -797,10 +792,21 @@ def main():
 		if len(update_list) > max_ob:
 			max_ob = len(update_list)
 		stage.update()
-		for object in update_list:
-			object.update()
-			pass
+		#for object in update_list:
+		#	object.update()
+		#	pass
 
+		#print(update_list)
+		#for i in update_list:
+		#	print i.update()
+		#print [obj.update() for obj in update_list]
+		update_list = [obj for obj in update_list if obj.update().to_remove == False]
+
+		add(bullet_array[0],multiply(sin(multiply(bullet_array[2],math.pi/180)),bullet_array[3]),bullet_array[0]) 
+		subtract(bullet_array[1],multiply(cos(multiply(bullet_array[2],math.pi/180)),bullet_array[3]),bullet_array[1]) 
+		
+		#print(bullet_array[3])
+		#print([o.speed for o in bullet_list])
 		if turn_actions >= 2:
 			vframe += 1
 			for object in update_list:
@@ -815,6 +821,7 @@ def main():
 	l.info( str(skip_c) + " skips")
 	l.info( "max objects # : " + str(max_ob))
 
+#profile.run('main()','prof.txt')
 
 if __name__ == '__main__':
 	main()
