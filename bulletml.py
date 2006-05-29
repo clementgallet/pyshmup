@@ -613,7 +613,21 @@ class Direction(Value):
 			if self.is_horizontal:
 				numeric_direction -= 90
 		elif self.type == "aim":
-			numeric_direction = initial_value + game_object_control.game_object.aim
+			if game_object_control.game_object.aimed_player is not None:
+				delta_x = game_object_control.game_object.aimed_player.x - game_object_control.game_object.x
+				delta_y = game_object_control.game_object.aimed_player.y - game_object_control.game_object.y
+				if abs(delta_y) < 0.000001:
+					if (delta_x) > 0:
+						aim = 90
+					else:
+						aim = -90
+				else:
+					aim = math.atan(- delta_x / delta_y) * 180 / math.pi
+					if delta_y > 0:
+						aim += 180
+			else:
+				aim = 0
+			numeric_direction = initial_value + aim
 		elif self.type == "relative":
 			numeric_direction = initial_value + game_object_control.game_object.direction
 		else: # sequence
