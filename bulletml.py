@@ -230,7 +230,13 @@ class Fire(Control):
 			else:
 				main_control.params = params
 
-			main_control.game_object.fire(main_control, numeric_direction, numeric_speed)
+			if bullet.subactions:
+			
+				main_control.game_object.fireml(main_control, numeric_direction, numeric_speed)
+
+			else:
+				main_control.game_object.firenoml(numeric_direction, numeric_speed)
+
 
 			game_object_control.last_speed = numeric_speed
 			game_object_control.last_direction = numeric_direction
