@@ -31,35 +31,29 @@ l.setLevel( logging.DEBUG )
 #  on "instancie" ensuite les objets effectivement utilisés par un appel à la Factory correspondante (avec son label)
 
 
+#######################
+# BulletML constructs
 
-
-
-# FIXME: *gasp*
-class NullAction:
-	def run(self, game_object_control, params=[]):
-		pass
-
+# This contains all the bulletml elements pertaining to a file (namespace)
 # namespaces[namespace]['action'|'fire'|'bullet'][label] = <controller_object>
 # namespaces[namespace]['main_actions'] = [top_action1, top_action2, ...]
 namespaces = { "null" : { 'action' : {}, 'fire' : {}, 'bullet' : {}, 'main_actions' : [] } }
 
 def get_action(namespace, label):
-	return copy.deepcopy( namespaces[namespace]['action'][label] )
+	return namespaces[namespace]['action'][label]
 
 def get_fire(namespace, label):
-	return copy.deepcopy( namespaces[namespace]['fire'][label] )
+	return namespaces[namespace]['fire'][label]
 
 def get_bullet(namespace, label):
-	return copy.deepcopy( namespaces[namespace]['bullet'][label] )
+	return namespaces[namespace]['bullet'][label]
 
 
 
 
-
-
-
-#######################
+###################################
 ## Controller objects
+## (reflecting BulletML elements)
 
 # run() status codes
 WAIT = 0 # returned by Wait
@@ -67,107 +61,86 @@ CONTINUE = 1 # action is not yet finished
 DONE = 2
 # those are communicated via game_object_control.turn_status
 
+class Cookie:
+	"""Simple data class to hold the state of an element and its children."""
+	def __init__(self, parent_cookie = None):
+		self.subcookies = {}
+		self.new = True
+		if parent_cookie is not None:
+			self.values = parent_cookie.values
+		else:
+			self.values = []
+
 class Control:
-	# A word about copy.deepcopy : it does not support copying functions,
-	# and so chokes on objects that have dynamically bound methods.
-	# DO NOT TRY TO DEEPCOPY A CONTROL THAT HAS BEEN .RUN()ED !
-	# It is actually cool since it sort of warns us about tampering with 
-	# namespaces[]'s content.
-	def run_first(self, game_object_control, params=[]):
-		pass
-
-	def run_not_first(self, game_object_control, params=[]):
-		l.debug( str(self) + " does not implement .run_not_first()" ) 
-
-	def run(self, game_object_control, params=[]):
-		self.run_first(game_object_control, params)
-		self.run = self.run_not_first
-		self.run(game_object_control, params)
-		
-	# We can't really always restart with a "pure" control (ie. from namespaces)
-	# because of the sequence-type speeds and directions. Therefore we need
-	# explicit restarting, sometimes preserving part of the state.
-	# This has a few consequences :
-	#  - run_first should allow multiple calls, or reinit() must be overloaded.
-	#  - the original state should never really be forgotten (namely variables
-	#    set by Builders.
-	def reinit(self, game_object_control, params=[]):
-		self.run_first(game_object_control, params)
+	def run(self, game_object_control, cookie):
+		if cookie.new:
+			cookie.new = False
+			l.warning(str(self) + "does not implement run.")
 		
 
 class Bullet(Control):
+	"""A Bullet is merely a bunch of actions.
+	
+	Not runnable per se."""
 	def __init__(self):
 		self.subactions = []
+
 
 # if an action is found in a file, build the action separately and ref it
 
 class Action(Control):
+	"""An action contains other sub-actions and runs them in order,
+	waiting for one to signal completion before getting to the next one."""
 	def __init__(self):
 		self.subactions = []
 
-	def run_not_first(self, game_object_control, params = []):
-#		is_done = True # -> False if a subaction is not finished
-#		for child in self.subactions:
-#			child.run( game_object_control, params )
-#			if game_object_control.turn_status == CONTINUE:
-#				is_done = False
-#			elif game_object_control.turn_status == WAIT:
-#				is_done = False
-#				break
-#		if is_done:
-#			game_object_control.turn_status = DONE
-#		else:
-#			game_object_control.turn_status = CONTINUE
-		if self.current_index >= self.sub_length:
+	def run(self, game_object_control, cookie):
+		if cookie.new:
+			cookie.new = False
+			for subaction in self.subactions:
+				if subaction not in cookie.subcookies:
+					cookie.subcookies[subaction] = Cookie(cookie)
+				else:
+					cookie.subcookies[subaction].new = True
+			cookie.current_index = 0
+
+		if cookie.current_index >= self.sub_length:
 			game_object_control.turn_status = DONE
 		else:
-			self.subactions[self.current_index].run(game_object_control, params)
+			self.subactions[cookie.current_index].run(game_object_control, \
+			        cookie.subcookies[self.subactions[cookie.current_index]])
 			if game_object_control.turn_status == DONE:
-				self.current_index += 1
-				self.run_not_first(game_object_control, params)
-			if self.current_index >= self.sub_length:
+				cookie.current_index += 1
+				for subcookie in cookie.subcookies:
+					subcookie.new = True
+				self.run(game_object_control, cookie)
+			if cookie.current_index >= self.sub_length:
 				game_object_control.turn_status = DONE
 			else:
 				game_object_control.turn_status = CONTINUE
-			
 
-	def run_first(self, game_object_control, params=[]):
-		self.current_index = 0
-		self.sub_length = len(self.subactions)
-
-	def reinit(self, game_object_control, params=[]):
-		for child in self.subactions:
-			child.reinit(game_object_control, params)
-		self.current_index = 0
 
 class Fire(Control):
-	def reinit_launch(self, game_object_control, params=[]):
-		"""Builds the argument list for fire()."""
-		control = BulletMLController()
-		sub_control = BulletMLSubController()
-#		self.bulletref.reinit(game_object_control, params=[])
-		sub_control.top_action = copy.deepcopy(self.bulletref)
-		control.sub_controllers = [sub_control]
-		self.kwargs = { 'controller' : control }
-	
+	"""Gets a bullet from its bulletref and calls the game_object's fire() method,
+	passing it an appropriate cookie."""
+	def run(self, game_object_control, cookie):
+		if cookie.new:
+			cookie.new = False
 
-	def run_first(self, game_object_control, params=[]):
-		self.already_fired = False
-		self.reinit_launch(game_object_control, params)
-
-	def run_not_first(self, game_object_control, params=[]):
-		if not self.already_fired:
-			self.already_fired = True
+			if self.bulletref not in cookie.subcookies:
+				cookie.subcookies[self.bulletref] = Cookie(cookie)
 
 			main_control = BulletMLController()
 			main_control.game_object = game_object_control.game_object
+
+			child_cookie = Cookie()
+			bref_cookie = cookie.subcookies[self.bulletref]
 
 			bullet = self.bulletref.get_bullet()
 
 			for action in bullet.subactions:
 				main_control.add_action(action)
 
-			
 			# arbitrary order of precedence :
 			#  bullet < fire
 			# (if that turns out to be false, swap the lines ;) )
@@ -178,10 +151,7 @@ class Fire(Control):
 			# has its own too, whose actual values might depend en Fire's
 			# received params. confused yet ?
 
-			# most of this code may be sent to run_first ?
-
-
-
+			# where do the params come from ?
 			NOWHERE = 0
 			BULLET = 1
 			FIRE = 2
@@ -207,33 +177,33 @@ class Fire(Control):
 				direction_location = FIRE
 			except AttributeError: pass
 
-			self.bulletref.reinit_params(params)
 
 			if speed_location == FIRE:
-				numeric_speed = speed.get_standard(game_object_control, params)
+				numeric_speed = speed.get_standard(game_object_control, cookie)
 			elif speed_location == BULLET:
-				numeric_speed = speed.get_standard(game_object_control, self.bulletref.params)
+				numeric_speed = speed.get_standard(game_object_control, bref_cookie)
 			else:
 				numeric_speed = game_object_control.game_object.speed
 				
 			if direction_location == FIRE:
-				numeric_direction = direction.get_standard(game_object_control, params)
+				numeric_direction = direction.get_standard(game_object_control, cookie)
 			elif direction_location == BULLET:
-				numeric_direction = direction.get_standard(game_object_control, self.bulletref.params)
+				numeric_direction = direction.get_standard(game_object_control, bref_cookie)
 			else:
 				numeric_direction = game_object_control.game_object.direction
 				if self.is_horizontal:
 					numeric_direction -= 90
 
+
 			if self.bulletref.is_real_ref:
-				main_control.params = self.bulletref.params
+				child_cookie.values = self.bulletref.get_values(bref_cookie)
 			else:
-				main_control.params = params
+				child_cookie.values = cookie.values
+
+			main_control.cookie = child_cookie
 
 			if bullet.subactions:
-			
 				main_control.game_object.fireml(main_control, numeric_direction, numeric_speed)
-
 			else:
 				main_control.game_object.firenoml(numeric_direction, numeric_speed)
 
@@ -242,137 +212,121 @@ class Fire(Control):
 			game_object_control.last_direction = numeric_direction
 
 		game_object_control.turn_status = DONE
-			
-	# default reinit
 
 
 class ChangeDirection(Control):
 	# has two values :
 	#  term and direction
 
-	def run_not_first(self, game_object_control, params = []):
+	def run(self, game_object_control, params=[]):
+		if cookie.new:
+			cookie.new = False
+			cookie.initial_direction = game_object_control.game_object.direction
+			cookie.direction_offset = self.direction.get_standard(game_object_control, cookie) - \
+											self.initial_direction
+			cookie.direction_offset = cookie.direction_offset % 360
+			if cookie.direction_offset > 180:
+				cookie.direction_offset -= 360
+			elif cookie.direction_offset < 180:
+				cookie.direction_offset += 180
+			cookie.frame = 0
+			cookie.term = self.term_value.get(cookie)
+		
 		if self.frame >= self.term:
 			game_object_control.turn_status =  DONE
 		else:
 			self.frame += 1
-			game_object_control.game_object.direction = self.initial_direction + \
-			   (float(self.frame) / self.term) * self.direction_offset
+			game_object_control.game_object.direction = cookie.initial_direction + \
+			   (float(cookie.frame) / cookie.term) * cookie.direction_offset
 			game_object_control.turn_status =  CONTINUE
 
-	def run_first(self, game_object_control, params=[]):
-		self.initial_direction = game_object_control.game_object.direction
-		self.direction_offset = self.direction.get_standard(game_object_control, params) - \
-		                          self.initial_direction
-		self.direction_offset = self.direction_offset % 360
-		if abs(self.direction_offset) > 180:
-			self.direction_offset -= 360
-		self.frame = 0
-		self.term = self.term_value.get( params )
 
 class ChangeSpeed(Control):
 	# has two values :
 	#  term and speed
 
-	def run_not_first(self, game_object_control, params = []):
-		if self.frame >= self.term:
+	def run(self, game_object_control, cookie):
+		if cookie.new:
+			cookie.new = False
+			initial_speed = game_object_control.game_object.speed
+			cookie.frame = 0
+			cookie.term = int(self.term_value.get(cookie))
+	
+			if self.speed.type == "absolute":
+				cookie.theoretical_speed = initial_speed
+				cookie.speed_offset = float(self.speed.get(cookie) - \
+			 								initial_speed) / cookie.term
+				cookie.get_new_speed = self.get_new_speed_absolute
+			elif self.speed.type == "relative":
+				cookie.theoretical_speed = initial_speed
+				cookie.speed_offset = float(self.speed.get(cookie)) / cookie.term
+				cookie.get_new_speed = self.get_new_speed_relative
+			else: # "sequence"
+				cookie.last_speed = game_object_control.game_object.speed
+				cookie.get_new_speed = self.get_new_speed_sequence
+		
+		if cookie.frame >= cookie.term:
 			game_object_control.turn_status = DONE
 		else:
-			self.frame += 1
+			cookie.frame += 1
 			game_object_control.game_object.speed = \
-			       self.get_new_speed(game_object_control, params)
+			       cookie.get_new_speed(game_object_control, cookie)
 			game_object_control.turn_status = CONTINUE
 
-	def run_first(self, game_object_control, params = []):
-		initial_speed = game_object_control.game_object.speed
-		self.frame = 0
-		self.term = int(self.term_value.get( params ))
-		if self.term <= 0:
-			self.term = 1
-			l.error("Invalid term in speed : " + self.speed.formula)
 
-		if self.speed.type == "absolute":
-			self.theoretical_speed = initial_speed
-			self.speed_offset = float( self.speed.get(params) -
-			                       initial_speed ) / self.term
-			self.get_new_speed = self.get_new_speed_absolute
-		elif self.speed.type == "relative":
-			self.theoretical_speed = initial_speed
-			self.speed_offset = float( self.speed.get(params) ) / self.term
-			self.get_new_speed = self.get_new_speed_relative
-		else: # "sequence"
-			self.last_speed = game_object_control.game_object.speed
-			self.get_new_speed = self_get_new_speed_sequence
+	def get_new_speed_absolute(self, game_object_control, cookie):
+		cookie.theoretical_speed += cookie.speed_offset
+		return cookie.theoretical_speed
 
-	def get_new_speed_absolute(self, game_object_control, params=[]):
-		self.theoretical_speed += self.speed_offset
-		return self.theoretical_speed
-
-	def get_new_speed_relative(self, game_object_control, params=[]):
-		self.theoretical_speed += self.speed_offset
-		return self.theoretical_speed
+	def get_new_speed_relative(self, game_object_control, cookie):
+		cookie.theoretical_speed += cookie.speed_offset
+		return cookie.theoretical_speed
 		
 
 	def get_new_speed_sequence(self, game_object_control, params=[]):
-		# we assume it will be used to fire() (thus fed back)
-		return game_object_control.last_speed + self.get(params)
+		game_object_control.last_speed += self.speed.get(cookie)
+		return game_object_control.last_speed
 
-# FIXME: implement following remark
-# random note : when an action is represented as an actionRef, special
-# precautions should be taken so that the actionRef's params are transfered
-# in contrast, a «real» actionRef shoud not tranfer its given params
-# ==> have a flag
-	
-	
+
 
 class Accel(Control):
-	def run_first(self, game_object_control, params=[]):
-		self.term = self.term_value.get(params)
-		try:
-			self.horiz = self.horiz_value.get(params)
-			if self.term > 0:
-				self.horiz /= self.term
-			self.has_horiz = True
-		except AttributeError:
-			self.has_horiz = False
-		try:
-			self.vert = self.vert_value.get(params)
-			if self.term > 0:
-				self.vert /= self.term
-			self.has_vert = True
-		except AttributeError:
-			self.has_vert = False
-		self.frame = 0
+	def run(self, game_object_control, cookie):
+		if cookie.new:
+			cookie.new = False
+			cookie.term = int(self.term_value.get(cookie))
+			cookie.frame = 0
 
-	def run_not_first(self, game_object_control, params=[]):
-		if self.frame > self.term:
+			try:
+				cookie.horiz = self.horiz_value.get(cookie)
+			except AttributeError:
+				cookie.horiz = 0
+			if cookie.term > 0:
+				cookie.horiz /= cookie.term
+				
+			try:
+				cookie.vert = self.vert_value.get(cookie)
+			except AttributeError:
+				cookie.vert = 0
+			if cookie.term > 0:
+				cookie.vert /= cookie.term
+
+		if cookie.frame > cookie.term:
 			game_object_control.turn_status = DONE
 		else:
-			self.frame += 1
+			cookie.frame += 1
 			game_object_control.turn_status = CONTINUE
-			if not (self.has_horiz or self.has_vert):
+			if not (cookie.horiz or cookie.vert):
 				return
 			initial_speed = game_object_control.game_object.speed
 			initial_direction = game_object_control.game_object.direction
 			# on se ramene au cas vertical
 			if self.is_horizontal:
 				initial_direction -= 90
-				if self.has_horiz:
-					dy = self.horiz
-				else:
-					dy = 0
-				if self.has_vert:
-					dx = self.vert
-				else:
-					dx = 0
+				dy = cookie.horiz
+				dx = cookie.vert
 			else:
-				if self.has_horiz:
-					dx = self.horiz
-				else:
-					dx = 0
-				if self.has_vert:
-					dy = - self.vert
-				else:
-					dy = 0
+				dx = cookie.horiz
+				dy = - cookie.vert
 			xx =   initial_speed * math.sin( initial_direction * math.pi / 180 )
 			yy = - initial_speed * math.cos( initial_direction * math.pi / 180 )
 			xx += dx
@@ -396,104 +350,85 @@ class Accel(Control):
 
 					
 
-# note: correct way to build those is obviously to read full xml element then
-# construct object
-#  also, interpret formulas while collecting data
-#   but then what about params ?
-#    it's ok, params are children, so are fully built and calculated while
-#    reading. should build a list of them
-#     uh-oh.. WRONG. $rand and co. need te be recomputed each time. on the
-#     other hand, params are fixed at call time so... obviously we can't
-#     preinstantiate fully objects at read-time. I suggest a 
-#     Value/ComputedValue separation : Value.get_value() yields a 
-#     ComputedValue, eventually from formula. if value is not subject to
-#     change, ie. not a param in .*Ref or in a sequence...
-#      nope, what about sequence[changeSpeed($rand),wait(3)] ?
-#      formulas will be left intact for now
-#       only, when passing parameters, use Value.get
-
 class Wait(Control):
-	def run_first(self, game_object_control, params=[]):
-		self.term = self.term_value.get(params)
-		self.frame = 1
+	def run(self, game_object_control, cookie):
+		if cookie.new:
+			cookie.new = False
+			cookie.term = self.term_value.get(cookie)
+			cookie.frame = 1
 
-	def run_not_first(self, game_object_control, params=[]):
-		if self.frame > self.term:
+		if cookie.frame > cookie.term:
 			game_object_control.turn_status = DONE
 		else:
-			self.frame += 1
+			cookie.frame += 1
 			game_object_control.turn_status = WAIT
 
+
+
 class Vanish(Control):
-	def run_first(self, game_object_control, params=[]):
-		game_object_control.game_object.vanish()
+	def run(self, game_object_control, cookie):
+		if cookie.new:
+			cookie.new = False
+			game_object_control.game_object.vanish()
+		else:
+			l.warning("Same bullet vanishing several times.")
 
-	def run_not_first(self, game_object_control, params=[]):
-		game_object_control.turn_status = DONE
 
-# should repeat : someting,term=n ; wait,term=n ; somethingelse,term=m
-# exec somethingelse at all ?
-#  actually this is a problem for Action.run_not_first
 
 class Repeat(Control):
-	def run_not_first(self, game_object_control, params):
-		if self.repetition > self.times:
+	def run(self, game_object_control, cookie):
+		if cookie.new:
+			cookie.new = False
+			cookie.times = self.times_value.get(cookie)
+			cookie.repetition = 0
+			cookie.subcookies[self.actionref] = Cookie(cookie)
+
+		if cookie.repetition > cookie.times:
 			game_object_control.turn_status = DONE
 		else:
-			self.actionref.run(game_object_control, params)
+			self.actionref.run(game_object_control, cookie.subcookies[self.actionref])
 			if game_object_control.turn_status == DONE:
-				self.repetition += 1
-				if self.repetition != self.times:
-					self.actionref.reinit(game_object_control, params)
-					self.run_not_first(game_object_control, params)
+				cookie.repetition += 1
+				if cookie.repetition != cookie.times:
+					cookie.subcookies[self.actionref].new = True
+					self.run(game_object_control, cookie)
 			game_object_control.turn_status = CONTINUE
 
-	def run_first(self, game_object, params):
-		self.times = self.times_value.get( params )
-		self.repetition = 0
-	
 
-# when .run()ed, objects are passed a reference to the foe, bullet, etc..
-
-# Refs should store an instantiated object after the first call
-#  actually I should stock ready-to run versions of all named objects
-#  and clone them to instantiate them
-#  ==> factory
-#   what's more, Refs need to keep a namespace identifier. it might be
-#   set to current namespace upon bulding
 
 class BulletRef(Control):
 	def __init__(self):
 		self.param_values = []
 		self.is_real_ref = True
 
-	def reinit_params(self, params):
-		self.params = [val.get(params) for val in self.param_values]
+	def get_values(self, cookie):
+		return [val.get(cookie) for val in self.param_values]
 
 	def get_bullet(self):
 		return get_bullet(self.namespace, self.label)
+
+
 
 class ActionRef(Control):
 	def __init__(self):
 		self.param_values = []
 		self.is_real_ref = True
 
-	def reinit(self, game_object_control, params=[]):
-		self.reinit_params(params)
-		self.action.reinit(game_object_control, self.params)
-
-	def reinit_params(self, params):
-		self.params = [val.get(params) for val in self.param_values]
+	def get_values(self, cookie):
+		return [val.get(cookie) for val in self.param_values]
 		
-	def run_first(self, game_object_control, params=[]):
-		self.reinit_params(params)
-		self.action = get_action(self.namespace, self.label)
+	def run(self, game_object_control, cookie):
+		if cookie.new:
+			cookie.new = False
+			self.action = get_action(self.namespace, self.label)
+			if self.action not in cookie.subcookies:
+				cookie.subcookies[self.action] = Cookie(cookie)
+			cookie.subcookies[self.action].new = True
 
-	def run_not_first(self, game_object_control, params=[]):
-		if self.is_real_ref:
-			self.action.run(game_object_control, self.params)
-		else:
-			self.action.run(game_object_control, params)
+			if self.is_real_ref:
+				cookie.subcookies[self.action].values = self.get_values(cookie)
+
+		self.action.run(game_object_control, cookie.subcookies[self.action])
 			
 
 
@@ -502,22 +437,21 @@ class FireRef(Control):
 		self.param_values = []
 		self.is_real_ref = True
 
-	def reinit(self, game_object_control, params=[]):
-		self.reinit_params(params)
-		self.fire.reinit(game_object_control, params)
+	def get_values(self, cookie):
+		return [val.get(cookie) for val in self.param_values]
 
-	def reinit_params(self, params):
-		self.params = [val.get(params) for val in self.param_values]
+	def run(self, game_object_control, cookie):
+		if cookie.new:
+			cookie.new = False
+			self.fire = get_fire(self.namespace, self.label)
+			if self.fire not in cookie.subcookies:
+				cookie.subcookies[self.fire] = Cookie(cookie)
+			cookie.subcookies[self.fire].new = True
 
-	def run_first(self, game_object_control, params=[]):
-		self.fire = get_fire(self.namespace, self.label)
-		self.reinit_params(params)
+			if self.is_real_ref:
+				cookie.subcookies[self.fire].values = self.get_values(cookie)
 
-	def run_not_first(self, game_object_control, params = []):
-		if self.is_real_ref:
-			self.fire.run(game_object_control, self.params)
-		else:
-			self.fire.run(game_object_control, params)
+		self.fire.run(game_object_control, cookie.subcookies[self.fire])
 
 
 
@@ -533,7 +467,7 @@ HEUR_VALID_FORMULA = re.compile(r'^([0-9.]|\$(rand|rank|[0-9])|\(|\)|\+|-|/|\*)*
 filter_definitions = [
   ( re.compile(r'\$rand'), '(random.random())' ),
   ( re.compile(r'\$rank'), '(RANK)'),
-  ( re.compile(r'\$([0-9]+)'), r'(params[\1-1])') ]
+  ( re.compile(r'\$([0-9]+)'), r'(cookie.values[\1-1])') ]
 
 def substitute(r,repl):
 	# help fight the lambda abuses ! join now !
@@ -557,9 +491,11 @@ class Value:
 	"""
 	def set_formula(self, formula):
 		formula.replace( '\n', '' )
+		# Non-(harmfulness potential) checking
 		if not HEUR_VALID_FORMULA.match(formula):
-			l.error( 'Invalid formula : ' + formula )
+			l.error('Invalid formula : ' + formula)
 			formula='0'
+		# Performing substitutions for future eval()uation
 		old_formula = ''
 		while formula != old_formula:
 			old_formula = formula
@@ -567,15 +503,16 @@ class Value:
 				formula = f(formula)
 		self.formula=formula
 
-	def eval_formula(self, params=[]):
+	def eval_formula(self, cookie):
 		try:
 			return float(eval(self.formula))
 		except:
-			l.error( 'Invalid formula, interpreted as : ' + self.formula )
+			l.error('Invalid formula, interpreted as : ' + self.formula)
 			self.formula='0'
+			return 0
 
-	def get(self, params=[]):
-		return self.eval_formula(params)
+	def get(self, cookie):
+		return self.eval_formula(cookie)
 
 class BasicValue(Value):
 	"""Most basic use of value.
@@ -594,15 +531,15 @@ class Speed(Value):
 	- ChangeSpeed will have to use .get() to get a base numerical
 	   value and adapt it according to .type
 		"""
-	def get_standard(self, game_object_control, params=[]):
-		initial_value = self.get(params)
+	def get_standard(self, game_object_control, cookie):
+		initial_value = self.get(cookie)
 		if self.type == "absolute":
 			return initial_value
 		elif self.type == "relative":
 			return initial_value + game_object_control.game_object.speed
 		else: # sequence
 			try:
-				game_object_control.last_speed += self.get(params)
+				game_object_control.last_speed += self.get(cookie)
 			except AttributeError: #.last_speed
 				# default from noiz2sa
 				game_object_control.last_speed = 1
@@ -612,8 +549,8 @@ class Direction(Value):
 	"""Has a 'type' attribute.
 
 	Follows the same usage rules as Speed."""
-	def get_standard(self, game_object_control, params=[]):
-		initial_value = self.get(params)
+	def get_standard(self, game_object_control, cookie):
+		initial_value = self.get(cookie)
 		if self.type == "absolute":
 			numeric_direction =  initial_value
 			if self.is_horizontal:
@@ -638,10 +575,10 @@ class Direction(Value):
 			numeric_direction = initial_value + game_object_control.game_object.direction
 		else: # sequence
 			try:
-				game_object_control.last_direction += self.get(params)
+				game_object_control.last_direction += self.get(cookie)
 			except AttributeError:
 				game_object_control.last_direction = \
-				   game_object_control.game_object.direction + self.get(params)
+				   game_object_control.game_object.direction + self.get(cookie)
 			numeric_direction = game_object_control.last_direction
 		return numeric_direction
 
@@ -686,6 +623,7 @@ target_classes = {
 
 # should I encapsulate all of this in a single object ? is there a point ?
 
+# Common builders infrastructure, including magic .add_to()
 class Builder(object):
 	def __init__(self):
 		# needs to have a new one per object, thus in __init__ and not in class block level
@@ -696,15 +634,16 @@ class Builder(object):
 		if self.element_name in ['actionRef', 'bulletRef', 'fireRef']:
 			self.target.namespace = current_namespace
 
-	def add_to( self, builder ):
+	def add_to(self, builder):
 		self.post_build()
-		# $visitor calls $child.add_to_$($visitor.TYPE), passing himself as the argument on which to operate
+		# $parent calls $child.add_to_$($parent.TYPE), passing himself as the argument on which to operate
+		# semi-visitor pattern
 		try:
-			add_method=self.__getattribute__('add_to_' + builder.element_name )
+			add_method=self.__getattribute__('add_to_' + builder.element_name)
 		except:
-			l.error( "Don't know what to do with %s in %s." % (self.element_name, builder.element_name) )
+			l.error("Don't know what to do with %s in %s." % (self.element_name, builder.element_name))
 			return
-		add_method( builder )
+		add_method(builder)
 
 	def add_attrs(self, attrs):
 		pass
@@ -717,18 +656,22 @@ class Builder(object):
 			l.debug( "Ignoring text : " + text + " in " + self.element_name + "." )
 
 
+# Basic text aggregator
 class FormulaBuilder(Builder):
 	formula = ''
 	def add_text(self, text):
 		# Quadratic, but it should not matter, really.
 		self.formula += text
 
+# Builders of elements that can be subactions of another element
+# should inherit from this as well as Builder
 class SubActionBuilder:
 	def add_to_action(self, action_builder):
 		# self.post_build() has been called by Builder.add_to()
 		action_builder.target.subactions.append(self.target)
 
-
+# Top-level element, not actually reflected but its attributes are
+# passed down by build-time global variables
 class BulletmlBuilder(Builder):
 	element_name =  "bulletml"
 
@@ -751,7 +694,7 @@ class BulletBuilder(Builder):
 		try:
 			self.target.label = attrs.getValue('label')
 		except KeyError:
-			pass
+			self.target.label = get_unused_name('bullet')
 
 	def add_to_fire(self, fire_builder):
 		fire_builder.target.bulletref = self.get_ref()
@@ -808,6 +751,7 @@ class ActionBuilder(Builder):
 		namespaces[current_namespace]['action'][self.target.label] = self.target
 
 	def post_build(self):
+		self.target.sub_length = len(self.target.subactions)
 		try:
 			self.target.label
 		except:
@@ -869,7 +813,6 @@ class WaitBuilder(FormulaBuilder, SubActionBuilder):
 	def post_build(self):
 		self.target.term_value = BasicValue(self.formula)
 		
-
 
 class VanishBuilder(Builder, SubActionBuilder):
 	element_name="vanish"
@@ -977,6 +920,7 @@ class BulletRefBuilder(Builder, SubActionBuilder):
 		fire_builder.target.bulletref = self.target
 
 
+
 class ActionRefBuilder(Builder, SubActionBuilder):
 	element_name="actionRef"
 
@@ -990,6 +934,7 @@ class ActionRefBuilder(Builder, SubActionBuilder):
 		repeat_builder.target.target = self.target # clumsy
 
 
+
 class FireRefBuilder(Builder, SubActionBuilder):
 	element_name="fireRef"
 
@@ -999,14 +944,12 @@ class FireRefBuilder(Builder, SubActionBuilder):
 		except KeyError:
 			pass
 
-	# done
-
 
 class ParamBuilder(FormulaBuilder):
 	element_name="param"
 
 	def add_to_ref(self, ref_builder):
-		ref_builder.target.param_values.append( BasicValue(self.formula) )
+		ref_builder.target.param_values.append(BasicValue(self.formula))
 
 	add_to_actionRef = add_to_ref
 	add_to_fireRef = add_to_ref
@@ -1044,44 +987,56 @@ builder_classes = {
 					 'param'           : ParamBuilder,
 					 }
 					 
-
-class BulletMLHandler( xml.sax.handler.ContentHandler ):
-	def characters( self, chars ):
+# Sax events handler
+class BulletMLHandler(xml.sax.handler.ContentHandler):
+	def characters(self, chars):
 		if current_object_stack:
 			current_object = current_object_stack[-1]
-			current_object.add_text( chars.strip() )
+			current_object.add_text(chars.strip())
 
-	def startDocument( self ):
+	# Create a new namespace for the document
+	def startDocument(self):
 		namespaces[current_namespace] = { 'action' : {},
 		                                  'fire'   : {},
 													 'bullet' : {},
 													 'main_actions' : [] }
 
-	def endDocument( self ):
+	# Eventually add NullAction if no top action is found
+	def endDocument(self):
 		if not namespaces[current_namespace]['main_actions']:
-			namespaces[current_namespace]['main_actions'].append(NullAction())
-			l.warning( "No main action found in " + current_namespace )
+			l.warning("No main action found in " + current_namespace)
 
-	def startElement( self, name, attrs ):
+	# Create builders mirroring xml contents
+	def startElement(self, name, attrs):
 		if name in builder_classes:
 			builder = builder_classes[name]()
-			current_object_stack.append( builder )
-			builder.add_attrs(attrs) # does nothng if element doesn't like attrs
+			current_object_stack.append(builder)
+			builder.add_attrs(attrs) # does nothing if element doesn't like attrs
 		else:
-			l.warning( "Unknown element : " + name )
+			l.warning("Unknown element : " + name)
 
-	def startElementNS( self, name, qname, attrs ):
-		print name, qname, attrs
+	def startElementNS(self, name, qname, attrs):
+		uri, localname = name
+		if uri == "http://www.asahi-net.or.jp/~cs8k-cyu/bulletml":
+			self.startElement(localname, attrs)
+		else:	
+			l.warning("Unknown element : " + qname)
 
-	def endElement( self, name ):
+	# Add builder to parent
+	def endElement(self, name):
 		if name in builder_classes:
 			try:
 				builder = current_object_stack.pop()
 				if current_object_stack:
 					parent_builder = current_object_stack[-1]
-					builder.add_to( parent_builder )
+					builder.add_to(parent_builder)
 			except:
 				raise
+	
+	def endElementNS(self, name, qname):
+		uri, localname = name
+		if uri == "http://www.asahi-net.or.jp/~cs8k-cyu/bulletml":
+			self.endElement(name)
 
 #FIXME: find a slightly less moronic name
 myBulletMLHandler = BulletMLHandler()
@@ -1091,33 +1046,39 @@ myParser.setFeature(xml.sax.handler.feature_validation, False)
 myParser.setFeature(xml.sax.handler.feature_external_ges, False)
 myParser.setContentHandler(myBulletMLHandler)
 
-def set_action_namespace( name ):
-	global current_namespace
-	current_namespace = name
-
-def get_main_actions( name ):
+def get_main_actions(name):
 	if not name in namespaces:
-		set_action_namespace( name )
+		global current_namespace
+		current_namespace = name
 		try:
-			f = open( name, 'r' )
+			f = open(name, 'r')
 			myParser.parse(f)
 			f.close()
 		except Exception,ex:
-			l.error( "Error while parsing BulletML file : " + str(name) )
+			l.error("Error while parsing BulletML file : " + str(name))
 			l.debug("Exception :" + str(ex))
 			raise
 			return namespaces["null"]['main_actions']
-	return copy.deepcopy(namespaces[name]['main_actions'])
+	return namespaces[name]['main_actions']
 
+
+
+##########################
+## Top-level controllers
+
+# Contain top actions of a BulletMLController
+# Necessary to allow for separate params !?
+# FIXME: statute on this class's right to live
 class BulletMLSubController:
-	def run(self, params=[]):
-		self.top_action.run(self, params)
-		# "top_action" sucks
+	def run(self, cookie):
+		self.top_action.run(self, cookie)
 
+
+# Exported abstract controller
 class BulletMLController:
 	def __init__(self):
 		self.sub_controllers = []
-		self.params = []
+		self.cookie = Cookie()
 
 	def add_action(self, action):
 		sub_controller = BulletMLSubController()
@@ -1125,7 +1086,7 @@ class BulletMLController:
 		sub_controller.game_object = self.game_object
 		self.sub_controllers.append(sub_controller)
 
-	def set_behavior( self, name ): # name is really a namepace
+	def set_behavior(self, name): # name is really a namepace
 		master_actions = get_main_actions(name)
 		self.sub_controllers = []
 		for master_action in master_actions:
@@ -1137,30 +1098,9 @@ class BulletMLController:
 			sub_controller.game_object = game_object
 
 	def run(self):
+		if self.cookie.new:
+			self.cookie.new = False
+			for sub_controller in self.sub_controllers:
+				self.cookie.subcookies[sub_controller] = Cookie(self.cookie)
 		for sub_controller in self.sub_controllers:
-			sub_controller.run(self.params)
-
-
-############
-## Testing
-##  hopelessly bit rotten
-
-class FakeGameObject:
-	def __init__(self):
-		self.control = GameObjectController()
-		self.control.game_object = self
-		self.control.set_behavior('bee.xml')
-
-	def fire(self, bullet_control):
-		print "launching ", bullet_control, " in hyperspace"
-
-	direction = 0.0
-	speed = 1.0
-
-if __name__ == '__main__':
-	gamobj = FakeGameObject()
-	for i in xrange(500):
-		#print get_action("test.xml","topmove").subactions
-		gamobj.control.run()
-		#print (gamobj.direction, gamobj.speed)
-		#print i
+			sub_controller.run(self.cookie.subcookies[sub_controller])
