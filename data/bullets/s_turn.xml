@@ -1,0 +1,75 @@
+<bulletml>
+
+ <action label="top">
+
+ <changeDirection>
+ <direction>0</direction>
+ <term>1</term>
+ </changeDirection>
+
+ <changeSpeed>
+ <speed>2</speed>
+ <term>1</term>
+ </changeSpeed>
+
+ <changeSpeed>
+ <speed>0</speed>
+ <term>50+150*$rand</term>
+ </changeSpeed>
+
+   
+ <repeat><times>100</times>
+  
+   <action>
+
+     <fire>
+
+       <direction type="sequence">100</direction>
+       <speed>2</speed>
+       <bullet/>
+
+      </fire>
+    
+      <fire>
+
+       <direction type = "sequence">90</direction>
+       <speed>2</speed>
+       <bullet/>
+
+      </fire>
+      
+    <fire>
+
+       <direction type = "sequence">90</direction>
+       <speed>2</speed>
+       <bullet/>
+
+      </fire>
+      
+   <fire>
+
+       <direction type = "sequence">90</direction>
+       <speed>2</speed>
+       <bullet/>
+
+      </fire>
+      
+      <wait>12</wait>
+      
+     </action>
+
+     </repeat>
+
+  <changeDirection>
+   <direction>180</direction>
+   <term>1</term>
+  </changeDirection>
+
+  <changeSpeed>
+   <speed>2</speed>
+   <term>100</term>
+  </changeSpeed>
+
+ </action>
+
+</bulletml>

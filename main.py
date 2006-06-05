@@ -35,6 +35,8 @@ NO_DEATH = True
 WIDTH = 640
 HEIGHT = 480
 
+STAGE_FILE = "stage.xml"
+#STAGE_FILE = "stage2.xml"
 BITMAP_PATH = "data/images/"
 BEHAV_PATH = "data/bullets/"
 SHIP_BITMAP = "data/images/ship.png"
@@ -739,7 +741,7 @@ class Player:
 
 class Stage:
 	def __init__(self):
-		self.foe_list = copy.deepcopy(StagetoFoeList('stage.xml').getFoes())
+		self.foe_list = copy.deepcopy(StagetoFoeList(STAGE_FILE).getFoes())
 		self.frame = 0
 
 	def update(self):

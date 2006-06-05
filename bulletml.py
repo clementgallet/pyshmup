@@ -218,24 +218,24 @@ class ChangeDirection(Control):
 	# has two values :
 	#  term and direction
 
-	def run(self, game_object_control, params=[]):
+	def run(self, game_object_control, cookie):
 		if cookie.new:
 			cookie.new = False
 			cookie.initial_direction = game_object_control.game_object.direction
 			cookie.direction_offset = self.direction.get_standard(game_object_control, cookie) - \
-											self.initial_direction
+											cookie.initial_direction
 			cookie.direction_offset = cookie.direction_offset % 360
 			if cookie.direction_offset > 180:
 				cookie.direction_offset -= 360
 			elif cookie.direction_offset < 180:
-				cookie.direction_offset += 180
+				cookie.direction_offset += 360
 			cookie.frame = 0
 			cookie.term = self.term_value.get(cookie)
 		
-		if self.frame >= self.term:
+		if cookie.frame >= cookie.term:
 			game_object_control.turn_status =  DONE
 		else:
-			self.frame += 1
+			cookie.frame += 1
 			game_object_control.game_object.direction = cookie.initial_direction + \
 			   (float(cookie.frame) / cookie.term) * cookie.direction_offset
 			game_object_control.turn_status =  CONTINUE
@@ -251,11 +251,10 @@ class ChangeSpeed(Control):
 			initial_speed = game_object_control.game_object.speed
 			cookie.frame = 0
 			cookie.term = int(self.term_value.get(cookie))
-	
 			if self.speed.type == "absolute":
 				cookie.theoretical_speed = initial_speed
 				cookie.speed_offset = float(self.speed.get(cookie) - \
-			 								initial_speed) / cookie.term
+							    initial_speed) / cookie.term
 				cookie.get_new_speed = self.get_new_speed_absolute
 			elif self.speed.type == "relative":
 				cookie.theoretical_speed = initial_speed

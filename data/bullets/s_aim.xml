@@ -1,0 +1,129 @@
+<bulletml>
+
+ <action label="top">
+ 
+  <changeSpeed>
+   <speed>1</speed>
+   <term>1</term>
+  </changeSpeed>
+
+  <changeDirection>
+   <direction type="aim">0</direction>
+   <term>1</term>
+  </changeDirection>
+
+  <repeat><times>100</times>
+  
+   <action>
+   
+      <fire>
+
+       <direction type = "aim">0</direction>
+       <speed>3</speed>
+       <bullet/>
+
+      </fire>
+     <wait>5</wait>
+    <repeat><times>5</times>
+    
+     <action>
+
+      <fire>
+
+       <direction type = "sequence">0</direction>
+       <speed>3</speed>
+       <bullet/>
+
+      </fire>
+      
+      <wait>5</wait>
+      
+     </action>
+
+     </repeat>
+
+ <repeat><times>5</times>
+
+     <action>
+    
+      <fire>
+
+       <direction type = "sequence">10</direction>
+       <speed>3</speed>
+       <bullet/>
+
+      </fire>
+     
+   <fire>
+
+     <direction type = "sequence">-20</direction>
+     <speed>3</speed>
+     <bullet/>
+
+    </fire>
+    
+    <fire>
+
+     <direction type = "sequence">10</direction>
+     <speed>3</speed>
+     <bullet/>
+
+    </fire>
+       <wait>5</wait>
+
+     </action>
+	 
+     </repeat>
+
+   <fire>
+
+     <direction type = "sequence">-10</direction>
+     <speed>3</speed>
+     <bullet/>
+
+    </fire>
+    
+    <fire>
+
+     <direction type = "sequence">20</direction>
+     <speed>3</speed>
+     <bullet/>
+
+    </fire>
+ <wait>5</wait>
+  <repeat><times>5</times>
+
+     <action>
+    
+ 
+     
+   <fire>
+
+     <direction type = "sequence">-20</direction>
+     <speed>3</speed>
+     <bullet/>
+
+    </fire>
+    
+    <fire>
+
+     <direction type = "sequence">20</direction>
+     <speed>3</speed>
+     <bullet/>
+
+    </fire>
+       <wait>5</wait>
+
+     </action>
+	 
+     </repeat>
+
+    <wait>50</wait>
+
+   </action>
+
+  </repeat>
+
+ </action>
+
+</bulletml>
