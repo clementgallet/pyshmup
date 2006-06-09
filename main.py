@@ -35,8 +35,8 @@ NO_DEATH = True
 WIDTH = 640
 HEIGHT = 480
 
-STAGE_FILE = "stage.xml"
-#STAGE_FILE = "stage2.xml"
+#STAGE_FILE = "stage.xml"
+STAGE_FILE = "stage2.xml"
 BITMAP_PATH = "data/images/"
 BEHAV_PATH = "data/bullets/"
 SHIP_BITMAP = "data/images/ship.png"
@@ -74,7 +74,9 @@ FOE_RADIUS = 10.0 # foe's "hit-disc" radius, in game units
 
 PLAYER_SPEED = 2.0
 
-FOE_LIFE = 50
+FOE_LIFE = 30
+
+NB_LINES = 20 # number of lines for the shot
 
 SCALE = 400 # screen height in game units
 
@@ -103,6 +105,8 @@ if FONKY_LINES:
 	LINE_RADIUS2 = 10000*RADIUS2
 	FONKY_COLOR = [.205, .245, .245, 1]
 	FONKY_OFFSET = [ BACKGROUND_COLOR[i] - FONKY_COLOR[i] for i in [0,1,2] ]
+
+SHOT_COLOR = [.425, .475, .475, 1]
 
 ############
 ## Logging
@@ -172,6 +176,7 @@ def init_sdl():
 			l.error("Mixer failed to init : " + str(ex))
 			l.error("Disabling sound system.")
 			count += 1
+
 		if count < failed:
 			l.warning("Some SDL modules failed to initialize.")
 
@@ -470,43 +475,92 @@ class SimpleBulletML(SimpleBullet):
 
 		return self	
 
-SHOT_IN_SPEED = 12
-SHOT_OUT_SPEED = 10
-SHOT_IN_WIDTH = 8
-SHOT_OUT_WIDTH = 20
-SHOT_SPIN = 20
+
+SHOT_WIDTH = 50
 
 class Shot:
 
-	x = 0
-	y = 0
-	frame = 0
-	initial_x = 0
-	width = 10
-	speed = SHOT_IN_SPEED
-	out_time = 0
 	def __init__(self):
-		self.sprite = sprite.get_sprite( BULLET_BITMAP )
+
+		self.x = 0
+		self.y = 0
+		self.lines = []
+
 		shot_list.append(self)
 		update_list.append(self)
+		
 		self.to_remove = False
+		self.aimed_foe = None
+		
+
 		
 	def update(self):
 
-		if self.out_time < 0:
-			shot_list.remove(self)
-			self.to_remove = True
-		self.y += self.speed
-		self.x = math.cos(float(self.frame)*math.pi/(2*SHOT_SPIN))*self.width + self.initial_x
-		self.out_time -= 1
+		if not self.aimed_foe in foe_list and not self.to_remove:
+			self.vanish()
+			return self
+
+		dist = (self.x - self.aimed_foe.x)**2 + (self.y - self.aimed_foe.y)**2
+
+		xpos = ((self.aimed_foe.x > self.x) + (self.aimed_foe.x >= self.x) - 1)*(((self.aimed_foe.x - self.x)**2)/dist) + 1
+		xneg = 2 - xpos
+		ypos = ((self.aimed_foe.y > self.y) + (self.aimed_foe.y >= self.y) - 1)*(((self.aimed_foe.y - self.y)**2)/dist) + 1
+		yneg = 2 - ypos
+
+		xpos *= xpos
+		xneg *= xneg
+		ypos *= ypos
+		yneg *= yneg
+		
+		#print (str(xpos) + ' - ' + str(xneg) + ' - ' + str(ypos) + ' - ' + str(yneg))
+
+		choix = random.random()*(xpos + xneg + ypos + yneg)
+
+		shot_dist = math.sqrt(dist)/2
+		
+		if choix < xpos:
+			self.x += shot_dist
+		elif xpos <= choix < xneg + xpos:
+			self.x -= shot_dist
+		elif xneg + xpos <= choix < xneg + xpos + ypos:
+			self.y += shot_dist
+		else:
+			self.y -= shot_dist
+
+		self.lines.append((self.x,self.y))
+
 		return self
 	
 	def draw(self):
-		glPushMatrix()
-		glColor4f(1.0, 1.0, 1.0, 0.2)
-		glTranslatef(self.x, self.y, 0)
-		self.sprite.draw()
-		glPopMatrix()
+		#glPushMatrix()
+
+		if len(self.lines) > NB_LINES:
+			self.lines.pop(0)
+			
+		taille = len(self.lines) - 1
+		c = 0
+
+		if taille >= 0:
+			glDisable(GL_TEXTURE_2D)
+			for i in self.lines:
+				(x,y) = i
+				try:
+					pen_x = pen_x
+					SHOT_COLOR[3] = 1 - (float(taille - c) / NB_LINES)
+					glBegin(GL_LINES)
+					glColor4f(*SHOT_COLOR)
+					glVertex2f(x, y)
+					glVertex2f(pen_x, pen_y)
+					glEnd()
+				except:
+					pass
+				
+				pen_x = x
+				pen_y = y
+				
+				c += 1
+			glColor4f(1.0, 1.0, 1.0, 1.0)
+
 
 	def vanish(self):
 		shot_list.remove(self)
@@ -583,41 +637,19 @@ class Player:
 
 
 		if keys[KEY_SHOT]:
-			shot = Shot()
-			shot.initial_x = self.x
-			shot.y = self.y
-			shot.frame = self.frame
-			shot.width = SHOT_IN_WIDTH
-			shot.speed = SHOT_IN_SPEED
-			shot.x = math.cos(float(shot.frame)*math.pi/SHOT_SPIN)*shot.width + shot.initial_x
-			shot.out_time = (UNIT_HEIGHT*(1+OUT_LIMIT) - shot.y) / shot.speed
 			
-			shot = Shot()
-			shot.initial_x = self.x
-			shot.y = self.y
-			shot.frame = self.frame + 2*SHOT_SPIN
-			shot.speed = SHOT_IN_SPEED
-			shot.width = SHOT_IN_WIDTH
-			shot.x = math.cos(float(shot.frame)*math.pi/SHOT_SPIN)*shot.width + shot.initial_x
-			shot.out_time = (UNIT_HEIGHT*(1+OUT_LIMIT) - shot.y)/ shot.speed
+			foe_aimed_list = []
+			for foe in foe_list:
+				if foe.y > self.y and abs(foe.x - self.x) < SHOT_WIDTH / 2:
+					foe_aimed_list.append(foe)
 
-			shot = Shot()
-			shot.initial_x = self.x
-			shot.y = self.y
-			shot.frame = self.frame + SHOT_SPIN
-			shot.width = SHOT_OUT_WIDTH
-			shot.speed = SHOT_OUT_SPEED
-			shot.x = math.cos(float(shot.frame)*math.pi/SHOT_SPIN)*shot.width + shot.initial_x
-			shot.out_time = (UNIT_HEIGHT*(1+OUT_LIMIT) - shot.y)/ shot.speed
+			if foe_aimed_list:
+				foe_choosen = random.randint(0,len(foe_aimed_list) - 1)
+				shot = Shot()
+				shot.x = self.x
+				shot.y = self.y
+				shot.aimed_foe = foe_aimed_list[foe_choosen]
 
-			shot = Shot()
-			shot.initial_x = self.x
-			shot.y = self.y
-			shot.frame = self.frame + 3*SHOT_SPIN
-			shot.width = SHOT_OUT_WIDTH
-			shot.speed = SHOT_OUT_SPEED
-			shot.x = math.cos(float(shot.frame)*math.pi/SHOT_SPIN)*shot.width + shot.initial_x
-			shot.out_time = (UNIT_HEIGHT*(1+OUT_LIMIT) - shot.y)/ shot.speed
 
 		return self
 		# "front montant"
@@ -722,6 +754,9 @@ class Player:
 			glColor4f(1.0, 1.0, 1.0, 1.0)
 		#if DRAW_HITBOX and FONKY_LINES:
 		#	pygame.draw.circle(screen, FONKY_COLOR, (int(self.x), int(self.y)), int(RADIUS))
+
+		
+
 		glPushMatrix()
 		glTranslatef(self.x, self.y, 0)
 		self.t = (self.t+1)%360
@@ -802,8 +837,17 @@ def main():
 #	Foe()
 #	BulletMLFoe(FILE)
 	stage = Stage()
+	first_fps = first_ticks
+	frame_loc = 0
 #	while bullet_list or foe_list:
 	while pygame.time.get_ticks() < 50000:
+
+		frame_loc += 1
+
+		if pygame.time.get_ticks() - first_fps >= 1000:
+			pygame.display.set_caption("FIVE TONS OF FLAX ! - fps : " + str(frame_loc))
+			first_fps = pygame.time.get_ticks()
+			frame_loc = 0
 
 		for ev in pygame.event.get():
 			if ev.type == pygame.VIDEORESIZE:
