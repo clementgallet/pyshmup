@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# vim: ts=3:sw=3:noet
 
 import bulletml
 from bulletml import BulletMLController
@@ -18,6 +19,7 @@ from OpenGL.GL import * # evil
 from OpenGL.GLU import * 
 from Numeric import *
 import draw
+import coll
 
 #import profile
 
@@ -42,8 +44,8 @@ BITMAP_PATH = "data/images/"
 BEHAV_PATH = "data/bullets/"
 SHIP_BITMAP = "data/images/ship.png"
 #SHIP_BITMAP = "data/images/shot_small.png"
-BULLET_BITMAP = "data/images/shot.png"
-BULLET_NOT_BITMAP = "data/images/shot2.png"
+BULLET_BITMAP = "data/images/shot3.png"
+BULLET_NOT_BITMAP = "data/images/shot4.png"
 #BULLET_BITMAP = "data/images/shot_small.png"
 FOE_BITMAP = "data/images/foe.png"
 #FILE = "data/bullets/doud.xml"
@@ -86,8 +88,6 @@ bulletml.RANK = 0.5 # difficulty setting, 0 to 1
 FPS = 60
 MAX_SKIP = 9
 
-ARRAY_DIM = 6
-
 SHOT_TIME = 40
 SHOT_FAST = 1 # in presses every SHOT_TIME frames
 
@@ -96,6 +96,7 @@ BACKGROUND_COLOR = (.235, .275, .275, 1)
 SINUS_LIST = [math.sin(i*math.pi / 1800) for i in range(3601)]
 COSINUS_LIST = [math.cos(i*math.pi / 1800) for i in range(3601)]
 
+SHOT_COLOR = [.425, .475, .475, 1]
 #####################
 ## Derived constants
 
@@ -109,7 +110,6 @@ if FONKY_LINES:
 	FONKY_COLOR = [.205, .245, .245, 1]
 	FONKY_OFFSET = [ BACKGROUND_COLOR[i] - FONKY_COLOR[i] for i in [0,1,2] ]
 
-SHOT_COLOR = [.425, .475, .475, 1]
 
 ############
 ## Logging
@@ -205,17 +205,25 @@ player_list = []
 foe_list = []
 shot_list = []
 
-bullet_array = zeros((ARRAY_DIM,8),Float)
+array_size = 8
+
 ARRAY_X = 0
 ARRAY_Y = 1
 ARRAY_Z = 2
 ARRAY_DIRECTION = 3
 ARRAY_SPEED = 4
-ARRAY_CALLLIST = 5
-ARRAY_DIM = 6
+ARRAY_LIST = 5
+ARRAY_STATE = 6
+ARRAY_UNTIL = 7
+ARRAY_DIM = 8
+
+ARRAY_STATE_ML = 0
+ARRAY_STATE_DANG = 1
+ARRAY_STATE_NO_DANG = 2
+
+bullet_array = zeros((ARRAY_DIM,array_size),Float)
 
 array_fill = 0
-array_size = 8
 
 class Foe(object):
 	def __init__(self):
@@ -266,7 +274,7 @@ class Foe(object):
 		else:
 			new_bullet.speed = self.speed
 			
-		bullet_array[:5,new_bullet.index] = [self.x,self.y,self.z,new_bullet.direction,new_bullet.speed]
+		bullet_array[:ARRAY_SPEED+1,new_bullet.index] = [self.x,self.y,self.z,new_bullet.direction,new_bullet.speed]
 		new_bullet.sprite = self.bullet_sprite
 
 
@@ -297,7 +305,7 @@ class Foe(object):
 
 		new_bullet.out_time = int(min(time_x,time_y))
 
-		bullet_array[:ARRAY_DIRECTION,new_bullet.index] = [self.x,self.y,self.z+0.00001,new_bullet.direction,new_bullet.speed]
+		bullet_array[:ARRAY_SPEED+1,new_bullet.index] = [self.x,self.y,self.z+0.00001,new_bullet.direction,new_bullet.speed]
 		new_bullet.sprite = self.bullet_sprite
 
 
@@ -353,19 +361,20 @@ class SimpleBullet(object):
 		
 		self.to_remove = False
 		bullet_list.append(self)
-		self.sprite = sprite.get_sprite (BULLET_BITMAP)
-		bullet_array[5][self.index] = self.sprite.list
+		self.sprite = sprite.get_sprite(BULLET_BITMAP)
+		bullet_array[ARRAY_LIST][self.index] = self.sprite.list
+		self.sprite2 = sprite.get_sprite(BULLET_NOT_BITMAP)
 		#self.t = 0
 		#self.sin_spd = random.random() * 0.04
 	
 	def getx(self):
-		return bullet_array[0,self.index]
+		return bullet_array[ARRAY_X,self.index]
 	x = property(getx)
 	def gety(self):
-		return bullet_array[1,self.index]
+		return bullet_array[ARRAY_Y,self.index]
 	y = property(gety)
 	def getz(self):
-		return bullet_array[2,self.index]
+		return bullet_array[ARRAY_Z,self.index]
 	z = property(getz)
 		
 					
@@ -374,7 +383,7 @@ class SimpleBullet(object):
 		glPushMatrix()
 		glColor4f(1.0, 1.0, 1.0, 0.2)
 
-	      	self.x,self.y = bullet_array[:2,self.index]
+	      	self.x,self.y = bullet_array[:ARRAY_Y+1,self.index]
 
 		glTranslatef(self.x, self.y, 0)#math.sin(self.t)*5)
 		# glRotatef(self.t * 180/math.pi, 0, 0, 1)
@@ -398,12 +407,10 @@ class SimpleBullet(object):
 class SimpleBulletNoML(SimpleBullet):
 
 	def __init__(self):
-		self.until = 0
-		self.dangerous = True
 		self.out_time = 0
 		bullet_noml_list.append(self)
 		super(SimpleBulletNoML, self).__init__()
-
+		bullet_array[ARRAY_STATE][self.index] = ARRAY_STATE_DANG + 0.5
 
 	def vanish(self):
 		bullet_noml_list.remove(self)
@@ -414,13 +421,14 @@ class SimpleBulletNoML(SimpleBullet):
 class SimpleBulletML(SimpleBullet):
 
 	def __init__(self, bulletml_behav=None):
-
+		
 		update_list.append(self)
 		self.controller = BulletMLController()
 		self.controller.game_object = self
 		if bulletml_behav is not None:
 			self.controller.set_behavior(bulletml_behav)
 		super(SimpleBulletML, self).__init__()
+		bullet_array[ARRAY_STATE][self.index] = ARRAY_STATE_ML + 0.5
 
 	def fireml(self, controller, direction=None, speed=None):
 		new_bullet = SimpleBulletML()
@@ -438,7 +446,7 @@ class SimpleBulletML(SimpleBullet):
 		else:
 			new_bullet.speed = self.speed
 			
-		bullet_array[:5,new_bullet.index] = self.x,self.y,self.z+0.0001,new_bullet.direction,new_bullet.speed
+		bullet_array[:ARRAY_SPEED+1,new_bullet.index] = self.x,self.y,self.z+0.0001,new_bullet.direction,new_bullet.speed
 		new_bullet.sprite = self.sprite
 
 	def firenoml(self, direction=None, speed=None):
@@ -469,7 +477,7 @@ class SimpleBulletML(SimpleBullet):
        			time_y = (-UNIT_HEIGHT*(1+OUT_LIMIT) - self.y)/(-COSINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
 
        		new_bullet.out_time = int(min(time_x,time_y))
-		bullet_array[:5,new_bullet.index] = self.x,self.y,self.z,new_bullet.direction,new_bullet.speed
+		bullet_array[:ARRAY_SPEED+1,new_bullet.index] = self.x,self.y,self.z,new_bullet.direction,new_bullet.speed
 		new_bullet.sprite = self.sprite
 
 	def update(self):
@@ -479,17 +487,17 @@ class SimpleBulletML(SimpleBullet):
 		if self.to_remove:
 			return self
 		else:
-			bullet_array[3:5,self.index] = self.direction % 360, self.speed
+			bullet_array[ARRAY_DIRECTION:ARRAY_SPEED+1,self.index] = self.direction % 360, self.speed
 
 		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
 		       self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT):
 			self.vanish()
 			return self
 			
-		for player in player_list:
-			if max(abs(self.x - player.x),abs(self.y - player.y)) <= RADIUS:
-				player.vanish()
-				self.vanish()
+		#for player in player_list:
+		#	if max(abs(self.x - player.x),abs(self.y - player.y)) <= RADIUS:
+		#		player.vanish()
+		#		self.vanish()
 
 		return self	
 
@@ -608,50 +616,16 @@ class Player:
 
 		for bullet in bullet_noml_list:
 
-			if bullet.out_time == 0:
+			if bullet.out_time <= 0:
 				bullet.vanish()
-			bullet.out_time -= 1
-			
-			if bullet.dangerous:
+			else:
+				bullet.out_time -= 1
 
-				if bullet.until > 0:
-					bullet.until -= 1
-
-				else:
-					bullet.dangerous = False				
-					x,y = bullet_array[:2,bullet.index]
-										
-					if abs(x - self.x) > RADIUS:
-						signe_x = (x > self.x) + (x >= self.x ) - 1
-						rat_x = SINUS_LIST[int(10*(bullet.direction % 360))]*bullet.speed - signe_x * PLAYER_SPEED
-						if rat_x != 0:
-							t_x = (signe_x * RADIUS - x + self.x) / rat_x
-							if t_x >= 0 and - UNIT_WIDTH < self.x + signe_x * t_x * PLAYER_SPEED < UNIT_WIDTH:
-								if abs(y - self.y) > RADIUS:
-									signe_y = (y > self.y) + (y >= self.y) - 1
-									rat_y = -COSINUS_LIST[int(10*(bullet.direction % 360))]*bullet.speed - signe_y * PLAYER_SPEED
-									if rat_y != 0:	
-										t_y = (signe_y * RADIUS - y + self.y) / rat_y
-										if t_y >= 0:
-											bullet.dangerous = True
-											bullet.until = int(max (t_x, t_y))
-
-								else:
-									bullet.dangerous = True
-									bullet.until = int(t_x)
-					else:
-						if abs(y - self.y) > RADIUS:
-							signe_y = (y > self.y) + (y >= self.y) - 1
-							rat_y = -COSINUS_LIST[int(10*(bullet.direction % 360))]*bullet.speed - signe_y * PLAYER_SPEED
-							if rat_y != 0:
-								t_y = (signe_y * RADIUS - y + self.y) / rat_y
-								if t_y >= 0:
-									bullet.dangerous = True
-									bullet.until = int(t_y)
-
-						else:
-							self.vanish()
-							bullet.vanish()
+		res = coll.coll(bullet_array,array_fill,self.x,self.y,42)
+		#!TODO : Works only for one player
+		if res >= 0:
+			self.vanish()
+			bullet_list[res].vanish()
 
 
 		if keys[KEY_SHOT]:
@@ -760,7 +734,7 @@ class Player:
 		if FONKY_LINES:
 			glDisable(GL_TEXTURE_2D)
 			for i in range(array_fill):
-				x,y = bullet_array[:2,i]
+				x,y = bullet_array[:ARRAY_Y+1,i]
 				coeff = ((float(self.x)-x)**2+(self.y-y)**2)/LINE_RADIUS2
 				if coeff <= 1:
 					FONKY_COLOR[3] = (1-coeff) ** 2 # alpha component
@@ -882,8 +856,25 @@ def main():
 
 		update_list = [obj for obj in update_list if obj.update().to_remove == False]
 
-		add(bullet_array[0],multiply(sin(multiply(bullet_array[3],math.pi/180)),bullet_array[4]),bullet_array[0])
-		subtract(bullet_array[1],multiply(cos(multiply(bullet_array[3],math.pi/180)),bullet_array[4]),bullet_array[1])
+		add( \
+		  bullet_array[ARRAY_X], \
+		  multiply( \
+		    sin( \
+		      multiply( \
+		        bullet_array[ARRAY_DIRECTION], \
+		        math.pi/180)), \
+		    bullet_array[ARRAY_SPEED]), \
+		  bullet_array[ARRAY_X])
+
+		subtract( \
+		  bullet_array[ARRAY_Y], \
+		  multiply( \
+		    cos( \
+		      multiply( \
+		        bullet_array[ARRAY_DIRECTION], \
+		        math.pi/180)), \
+		    bullet_array[ARRAY_SPEED]), \
+		  bullet_array[ARRAY_Y]) 
 
 		if turn_actions >= 2:
 			vframe += 1

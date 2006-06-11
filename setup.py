@@ -8,3 +8,11 @@ setup(name = 'draw',
 	version = '0.1',
 	description = 'This is also a demo package',
 	ext_modules = [draw])
+
+coll = Extension('coll', sources = ['coll.c'],
+	)
+
+setup(name = 'coll',
+	version = '0.1',
+	description = 'This is also a demo package',
+	ext_modules = [coll])
