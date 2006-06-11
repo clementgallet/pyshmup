@@ -1,0 +1,40 @@
+<bulletml>
+ <action label="top">
+ <repeat><times>20</times>
+ <action>
+  <repeat><times>40</times>
+   <action>
+	 <fire>
+	  <bulletRef label="stop"/>
+	  <speed>10</speed>
+	  <direction type="sequence">4</direction>
+    </fire>
+	 <repeat><times>10</times>
+	 <action>
+	 <fire>
+	  <bulletRef label="stop"/>
+	  <speed type="sequence">3</speed>
+	  <direction type="sequence">0</direction>
+    </fire>
+	 </action>
+	 </repeat>
+   </action>
+  </repeat>
+  <wait>40</wait>
+  </action>
+  </repeat>
+ </action>
+
+ <bullet label="stop">
+  <action>
+   <wait>2</wait>
+	<fire>
+	 <bullet/>
+	 <speed>2</speed>
+	 <direction type="aim">0</direction>
+	</fire>
+  <vanish/>
+  </action>
+ </bullet>
+
+</bulletml>

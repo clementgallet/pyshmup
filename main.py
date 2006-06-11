@@ -17,6 +17,7 @@ import copy
 from OpenGL.GL import * # evil
 from OpenGL.GLU import * 
 from Numeric import *
+import draw
 
 #import profile
 
@@ -28,15 +29,15 @@ KEY_SHOT = pygame.K_q
 
 DRAW_HITBOX = True
 
-FONKY_LINES = True
+FONKY_LINES = False
 
 NO_DEATH = True
 
 WIDTH = 640
 HEIGHT = 480
 
-#STAGE_FILE = "stage.xml"
-STAGE_FILE = "stage2.xml"
+STAGE_FILE = "stage.xml"
+#STAGE_FILE = "stage2.xml"
 BITMAP_PATH = "data/images/"
 BEHAV_PATH = "data/bullets/"
 SHIP_BITMAP = "data/images/ship.png"
@@ -80,10 +81,12 @@ NB_LINES = 20 # number of lines for the shot
 
 SCALE = 400 # screen height in game units
 
-RANK = 0.5 # difficulty setting, 0 to 1
+bulletml.RANK = 0.5 # difficulty setting, 0 to 1
 
 FPS = 60
 MAX_SKIP = 9
+
+ARRAY_DIM = 6
 
 SHOT_TIME = 40
 SHOT_FAST = 1 # in presses every SHOT_TIME frames
@@ -141,8 +144,6 @@ def set_perspective(width, height):
 
 images = {}
 
-bulletml.RANK = RANK
-
 def get_image(name):
 	if name in images:
 		return images[name]
@@ -186,7 +187,7 @@ def init_sdl():
 	set_perspective(WIDTH, HEIGHT)
 
 	glClearColor(*BACKGROUND_COLOR)
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE)#MINUS_SRC_ALPHA)
 	glEnable(GL_BLEND)
 
 	glEnable(GL_TEXTURE_2D)
@@ -204,21 +205,29 @@ player_list = []
 foe_list = []
 shot_list = []
 
-bullet_array = zeros((4,512),Float)
+bullet_array = zeros((ARRAY_DIM,8),Float)
+ARRAY_X = 0
+ARRAY_Y = 1
+ARRAY_Z = 2
+ARRAY_DIRECTION = 3
+ARRAY_SPEED = 4
+ARRAY_CALLLIST = 5
+ARRAY_DIM = 6
+
 array_fill = 0
-array_size = 512
+array_size = 8
 
 class Foe(object):
 	def __init__(self):
 		self.x = UNIT_WIDTH*0
 		self.y = UNIT_HEIGHT*0.3
+		self.z = 0
 		self.direction = 0
 		self.speed = 0
 		self.to_remove = False
 		self.sprite = sprite.get_sprite( FOE_BITMAP )
 		self.bullet_sprite = sprite.get_sprite( BULLET_BITMAP )
 		self.life = FOE_LIFE
-		
 		update_list.append(self)
 		foe_list.append(self)
 		
@@ -257,11 +266,12 @@ class Foe(object):
 		else:
 			new_bullet.speed = self.speed
 			
-		bullet_array[:,new_bullet.index] = [self.x,self.y,new_bullet.direction,new_bullet.speed]
+		bullet_array[:5,new_bullet.index] = [self.x,self.y,self.z,new_bullet.direction,new_bullet.speed]
 		new_bullet.sprite = self.bullet_sprite
 
 
 	def firenoml(self, direction=None, speed=None, new_bullet=None):
+		self.z -= 0.0001
 		if direction is not None:
 			new_bullet.direction = direction
 		else:
@@ -272,22 +282,22 @@ class Foe(object):
 			new_bullet.speed = self.speed
 			
 		if abs(new_bullet.direction % 180) < 0.1 or new_bullet.speed == 0:
-	       		time_x = 10000000
-	       	elif 0 < new_bullet.direction % 360 < 180:
-	       		time_x = (UNIT_WIDTH*(1+OUT_LIMIT) - self.x)/(SINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
-	       	else:
-       			time_x = (-UNIT_WIDTH*(1+OUT_LIMIT) - self.x)/(SINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
+			time_x = 10000000
+		elif 0 < new_bullet.direction % 360 < 180:
+			time_x = (UNIT_WIDTH*(1+OUT_LIMIT) - self.x)/(SINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
+		else:
+			time_x = (-UNIT_WIDTH*(1+OUT_LIMIT) - self.x)/(SINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
 
-       		if abs((new_bullet.direction % 180) - 90) < 0.1 or new_bullet.speed == 0:
-       			time_y = 10000000
-       		elif 90 < new_bullet.direction % 360 < 270:
-       			time_y = (UNIT_HEIGHT*(1+OUT_LIMIT) - self.y)/(-COSINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
-       		else:
-       			time_y = (-UNIT_HEIGHT*(1+OUT_LIMIT) - self.y)/(-COSINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
+		if abs((new_bullet.direction % 180) - 90) < 0.1 or new_bullet.speed == 0:
+			time_y = 10000000
+		elif 90 < new_bullet.direction % 360 < 270:
+			time_y = (UNIT_HEIGHT*(1+OUT_LIMIT) - self.y)/(-COSINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
+		else:
+			time_y = (-UNIT_HEIGHT*(1+OUT_LIMIT) - self.y)/(-COSINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
 
-       		new_bullet.out_time = int(min(time_x,time_y))
+		new_bullet.out_time = int(min(time_x,time_y))
 
-		bullet_array[:,new_bullet.index] = [self.x,self.y,new_bullet.direction,new_bullet.speed]
+		bullet_array[:ARRAY_DIRECTION,new_bullet.index] = [self.x,self.y,self.z+0.00001,new_bullet.direction,new_bullet.speed]
 		new_bullet.sprite = self.bullet_sprite
 
 
@@ -328,18 +338,15 @@ class BulletMLFoe(Foe):
 
 		return super(BulletMLFoe, self).update()
 
-
 class SimpleBullet(object):
 	def __init__(self):
 		global bullet_array,array_size,array_fill,to_remove_array
 		self.direction = 0
 		self.speed = 1
-		self.x = 0
-		self.y = UNIT_HEIGHT * 0.5
 		self.index = array_fill
 		array_fill += 1
 		if array_fill == array_size:
-			new_array = zeros((4,2*array_size),Float)
+			new_array = zeros((ARRAY_DIM,2*array_size),Float)
 			new_array[:,:array_size] = bullet_array
 			bullet_array = new_array
 			array_size *= 2
@@ -347,8 +354,19 @@ class SimpleBullet(object):
 		self.to_remove = False
 		bullet_list.append(self)
 		self.sprite = sprite.get_sprite (BULLET_BITMAP)
+		bullet_array[5][self.index] = self.sprite.list
 		#self.t = 0
 		#self.sin_spd = random.random() * 0.04
+	
+	def getx(self):
+		return bullet_array[0,self.index]
+	x = property(getx)
+	def gety(self):
+		return bullet_array[1,self.index]
+	y = property(gety)
+	def getz(self):
+		return bullet_array[2,self.index]
+	z = property(getz)
 		
 					
 	def draw(self):
@@ -420,11 +438,12 @@ class SimpleBulletML(SimpleBullet):
 		else:
 			new_bullet.speed = self.speed
 			
-		bullet_array[:,new_bullet.index] = [self.x,self.y,new_bullet.direction,new_bullet.speed]
+		bullet_array[:5,new_bullet.index] = self.x,self.y,self.z+0.0001,new_bullet.direction,new_bullet.speed
 		new_bullet.sprite = self.sprite
 
 	def firenoml(self, direction=None, speed=None):
 		new_bullet = SimpleBulletNoML()
+		new_bullet.aimed_player = self.aimed_player
 
 		if direction is not None:
 			new_bullet.direction = direction
@@ -436,22 +455,21 @@ class SimpleBulletML(SimpleBullet):
 			new_bullet.speed = self.speed
 			
 		if abs(new_bullet.direction % 180) < 0.1 or new_bullet.speed == 0:
-			time_x = 10000000
-		elif 0 < new_bullet.direction % 360 < 180:
-			time_x = (UNIT_WIDTH*(1+OUT_LIMIT) - self.x)/(SINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
-		else:
-			time_x = (-UNIT_WIDTH*(1+OUT_LIMIT) - self.x)/(SINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
+	       		time_x = 10000000
+	       	elif 0 < new_bullet.direction % 360 < 180:
+	       		time_x = (UNIT_WIDTH*(1+OUT_LIMIT) - self.x)/(SINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
+	       	else:
+       			time_x = (-UNIT_WIDTH*(1+OUT_LIMIT) - self.x)/(SINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
 
-		if abs((new_bullet.direction % 180) - 90) < 0.1 or new_bullet.speed == 0:
-			time_y = 10000000
-		elif 90 < new_bullet.direction % 360 < 270:
-			time_y = (UNIT_HEIGHT*(1+OUT_LIMIT) - self.y)/(-COSINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
-		else:
-			time_y = (-UNIT_HEIGHT*(1+OUT_LIMIT) - self.y)/(-COSINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
+       		if abs((new_bullet.direction % 180) - 90) < 0.1 or new_bullet.speed == 0:
+       			time_y = 10000000
+       		elif 90 < new_bullet.direction % 360 < 270:
+       			time_y = (UNIT_HEIGHT*(1+OUT_LIMIT) - self.y)/(-COSINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
+       		else:
+       			time_y = (-UNIT_HEIGHT*(1+OUT_LIMIT) - self.y)/(-COSINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
 
-		new_bullet.out_time = int(min(time_x,time_y))
-
-		bullet_array[:,new_bullet.index] = [self.x,self.y,new_bullet.direction,new_bullet.speed]
+       		new_bullet.out_time = int(min(time_x,time_y))
+		bullet_array[:5,new_bullet.index] = self.x,self.y,self.z,new_bullet.direction,new_bullet.speed
 		new_bullet.sprite = self.sprite
 
 	def update(self):
@@ -461,7 +479,7 @@ class SimpleBulletML(SimpleBullet):
 		if self.to_remove:
 			return self
 		else:
-			bullet_array[2:,self.index] = self.direction % 360, self.speed
+			bullet_array[3:5,self.index] = self.direction % 360, self.speed
 
 		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
 		       self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT):
@@ -603,37 +621,37 @@ class Player:
 					bullet.dangerous = False				
 					x,y = bullet_array[:2,bullet.index]
 										
-				       	if abs(x - self.x) > RADIUS:
-					       	signe_x = (x > self.x) + (x >= self.x ) - 1
-					       	rat_x = SINUS_LIST[int(10*(bullet.direction % 360))]*bullet.speed - signe_x * PLAYER_SPEED
-					       	if rat_x != 0:
-					       		t_x = (signe_x * RADIUS - x + self.x) / rat_x
-					       		if t_x >= 0 and - UNIT_WIDTH < self.x + signe_x * t_x * PLAYER_SPEED < UNIT_WIDTH:
-					       			if abs(y - self.y) > RADIUS:
-					       				signe_y = (y > self.y) + (y >= self.y) - 1
-					       				rat_y = -COSINUS_LIST[int(10*(bullet.direction % 360))]*bullet.speed - signe_y * PLAYER_SPEED
-					       				if rat_y != 0:	
-					       					t_y = (signe_y * RADIUS - y + self.y) / rat_y
-					       					if t_y >= 0:
-					       						bullet.dangerous = True
-					       						bullet.until = int(max (t_x, t_y))
+					if abs(x - self.x) > RADIUS:
+						signe_x = (x > self.x) + (x >= self.x ) - 1
+						rat_x = SINUS_LIST[int(10*(bullet.direction % 360))]*bullet.speed - signe_x * PLAYER_SPEED
+						if rat_x != 0:
+							t_x = (signe_x * RADIUS - x + self.x) / rat_x
+							if t_x >= 0 and - UNIT_WIDTH < self.x + signe_x * t_x * PLAYER_SPEED < UNIT_WIDTH:
+								if abs(y - self.y) > RADIUS:
+									signe_y = (y > self.y) + (y >= self.y) - 1
+									rat_y = -COSINUS_LIST[int(10*(bullet.direction % 360))]*bullet.speed - signe_y * PLAYER_SPEED
+									if rat_y != 0:	
+										t_y = (signe_y * RADIUS - y + self.y) / rat_y
+										if t_y >= 0:
+											bullet.dangerous = True
+											bullet.until = int(max (t_x, t_y))
 
-					       			else:
-					       				bullet.dangerous = True
-					       				bullet.until = int(t_x)
-				       	else:
-				       		if abs(y - self.y) > RADIUS:
-				       			signe_y = (y > self.y) + (y >= self.y) - 1
-				       			rat_y = -COSINUS_LIST[int(10*(bullet.direction % 360))]*bullet.speed - signe_y * PLAYER_SPEED
-				       			if rat_y != 0:
-				       				t_y = (signe_y * RADIUS - y + self.y) / rat_y
-				       				if t_y >= 0:
-				       					bullet.dangerous = True
-				       					bullet.until = int(t_y)
+								else:
+									bullet.dangerous = True
+									bullet.until = int(t_x)
+					else:
+						if abs(y - self.y) > RADIUS:
+							signe_y = (y > self.y) + (y >= self.y) - 1
+							rat_y = -COSINUS_LIST[int(10*(bullet.direction % 360))]*bullet.speed - signe_y * PLAYER_SPEED
+							if rat_y != 0:
+								t_y = (signe_y * RADIUS - y + self.y) / rat_y
+								if t_y >= 0:
+									bullet.dangerous = True
+									bullet.until = int(t_y)
 
-				       		else:
+						else:
 							self.vanish()
-				       			bullet.vanish()
+							bullet.vanish()
 
 
 		if keys[KEY_SHOT]:
@@ -864,15 +882,18 @@ def main():
 
 		update_list = [obj for obj in update_list if obj.update().to_remove == False]
 
-		add(bullet_array[0],multiply(sin(multiply(bullet_array[2],math.pi/180)),bullet_array[3]),bullet_array[0])
-		subtract(bullet_array[1],multiply(cos(multiply(bullet_array[2],math.pi/180)),bullet_array[3]),bullet_array[1])
+		add(bullet_array[0],multiply(sin(multiply(bullet_array[3],math.pi/180)),bullet_array[4]),bullet_array[0])
+		subtract(bullet_array[1],multiply(cos(multiply(bullet_array[3],math.pi/180)),bullet_array[4]),bullet_array[1])
 
 		if turn_actions >= 2:
 			vframe += 1
-			for object in update_list:
+			for object in player_list:
 				object.draw()
-			for object in bullet_noml_list:
+			for object in foe_list:
 				object.draw()
+			for object in shot_list:
+				object.draw()
+			draw.draw(bullet_array,array_fill)
 			pygame.display.flip()
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 		frame += 1
