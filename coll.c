@@ -2,17 +2,27 @@
 #include <python2.3/Numeric/arrayobject.h>
 #include <math.h>
 #include <stdio.h>
+
 #define ARRAY_X 0
 #define ARRAY_Y 1
 #define ARRAY_DIRECTION 3
 #define ARRAY_SPEED 4
 #define ARRAY_STATE 6
 #define ARRAY_UNTIL 7
+
 #define ARRAY_STATE_ML 0
-#define ARRAY_STATE_DANG 1
-#define ARRAY_STATE_NO_DANG 2
+#define ARRAY_STATE_NO_DANG 1
+#define ARRAY_STATE_DANG 2
+#define ARRAY_STATE_UNKNOWN 3
+// When the state is at ARRAY_STATE_UNKNOWN,
+// each player put the dangerousness of the bullet toward it, 
+// and raise by one the ARRAY_STATE value
+// until the value ARRAY_STATE_DANG + #(players)
+// so that all the players have treated the bullet state
+
 #define RADIUS 3.0
 #define PLAYER_SPEED 2.0
+
 #define WIDTH 640
 #define HEIGHT 480
 #define UNIT_HEIGHT 200
@@ -30,6 +40,11 @@ double max(double x,double y)
   return ((x>y) ? x : y);
 }
 
+double min(double x,double y)
+{
+	return ((x<y) ? x : y);
+}
+
 int truemod(int x,int n)
 {
   int y=x;
@@ -44,9 +59,9 @@ double COSINUS_LIST[3600];
 static PyObject *coll(PyObject *self, PyObject *args)
 {
   double x,y,rat_x,rat_y,t_x,t_y,b_x,b_y,b_d,b_s;
-  int prem,size,signe_x,signe_y,i;
+  int nb_players,size,signe_x,signe_y,i,result=-1;
   PyArrayObject *array;
-  PyArg_ParseTuple(args,"O!iddi",&PyArray_Type,&array,&size,&x,&y,&prem);
+  PyArg_ParseTuple(args,"O!iddi",&PyArray_Type,&array,&size,&x,&y,&nb_players);
   
   for (i=0;i<size;i++)
     {
@@ -54,15 +69,15 @@ static PyObject *coll(PyObject *self, PyObject *args)
       b_y = *(double *)(array->data + ARRAY_Y*array->strides[0] + i*array->strides[1]);
       
       if ((int)*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1]) == ARRAY_STATE_ML)
-	if ((dabs(b_x - x) < RADIUS) && (dabs(b_y - y)< RADIUS))
-	  return (Py_BuildValue("i",i));
+			if ((dabs(b_x - x) < RADIUS) && (dabs(b_y - y)< RADIUS))
+	  			return (Py_BuildValue("i",i));
       
-      if ((int)*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1]) == ARRAY_STATE_DANG)
-	{	      
-	  if (*(double *)(array->data + ARRAY_UNTIL*array->strides[0] + i*array->strides[1]) > 0)
-	    (*(double *)(array->data + ARRAY_UNTIL*array->strides[0] + i*array->strides[1]))--;
-	  else
-	    {
+      if ((int)*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1]) >= ARRAY_STATE_DANG)
+			{	      
+	  			if (*(double *)(array->data + ARRAY_UNTIL*array->strides[0] + i*array->strides[1]) > 0 && (int)*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1]) == ARRAY_STATE_DANG) 
+	    			(*(double *)(array->data + ARRAY_UNTIL*array->strides[0] + i*array->strides[1]))--;
+	  			else
+	    			{
 	      b_d = *(double *)(array->data + ARRAY_DIRECTION*array->strides[0] + i*array->strides[1]);
 	      b_s = *(double *)(array->data + ARRAY_SPEED*array->strides[0] + i*array->strides[1]);
 	      
@@ -87,15 +102,23 @@ static PyObject *coll(PyObject *self, PyObject *args)
 				  t_y = (signe_y * RADIUS - b_y + y) / rat_y;
 				  if (t_y >= 0)
 				    {
-				      (*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1])) = (double)(ARRAY_STATE_DANG);
-				      (*(double *)(array->data + ARRAY_UNTIL*array->strides[0] + i*array->strides[1])) = max (t_x, t_y);
+					 	if (((int)*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1])) >= (ARRAY_STATE_DANG + nb_players - 1)) 
+				      	(*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1])) = (double)(ARRAY_STATE_DANG);
+						else
+				      	(*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1]))++;
+							
+				      (*(double *)(array->data + ARRAY_UNTIL*array->strides[0] + i*array->strides[1])) = min((max (t_x, t_y)),  (*(double *)(array->data + ARRAY_UNTIL*array->strides[0] + i*array->strides[1])) );
 				    }
 				}
 			    }
 			  else
 			    {
-			      (*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1])) = (double)(ARRAY_STATE_DANG);
-			      (*(double *)(array->data + ARRAY_UNTIL*array->strides[0] + i*array->strides[1])) = t_x;
+					 	if (((int)*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1])) >= (ARRAY_STATE_DANG + nb_players - 1)) 
+				      	(*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1])) = (double)(ARRAY_STATE_DANG);
+						else
+				      	(*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1]))++;
+							
+				      (*(double *)(array->data + ARRAY_UNTIL*array->strides[0] + i*array->strides[1])) = min(t_x,  (*(double *)(array->data + ARRAY_UNTIL*array->strides[0] + i*array->strides[1])) );
 			    }
 			}
 		    }
@@ -109,17 +132,21 @@ static PyObject *coll(PyObject *self, PyObject *args)
 		      t_y = (signe_y * RADIUS - b_y + y) / rat_y;
 		      if (t_y >= 0)
 			{
-			  (*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1])) = (double)(ARRAY_STATE_DANG + 0.5);
-			  (*(double *)(array->data + ARRAY_UNTIL*array->strides[0] + i*array->strides[1])) = t_y;
+					 	if (((int)*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1])) >= (ARRAY_STATE_DANG + nb_players - 1)) 
+				      	(*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1])) = (double)(ARRAY_STATE_DANG);
+						else
+				      	(*(double *)(array->data + ARRAY_STATE*array->strides[0] + i*array->strides[1]))++;
+							
+				      (*(double *)(array->data + ARRAY_UNTIL*array->strides[0] + i*array->strides[1])) = min(t_y,  (*(double *)(array->data + ARRAY_UNTIL*array->strides[0] + i*array->strides[1])) );
 			}
 		    }
 		}
 	      else
-		return (Py_BuildValue("i",i));
-	    }
-	}
-    }
-  return (Py_BuildValue("i",-1));
+				result=i; 
+}	    
+}	
+}    
+  return (Py_BuildValue("i",result));
 }
 
 static PyMethodDef DrawMethods[] = {

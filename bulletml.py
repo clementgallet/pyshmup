@@ -353,15 +353,10 @@ class Wait(Control):
 	def run(self, game_object_control, cookie):
 		if cookie.new:
 			cookie.new = False
-			cookie.term = self.term_value.get(cookie)
-			cookie.frame = 1
-
-		if cookie.frame > cookie.term:
-			game_object_control.turn_status = DONE
-		else:
-			cookie.frame += 1
+			game_object_control.game_object.wait = self.term_value.get(cookie)
 			game_object_control.turn_status = WAIT
-
+		else:	
+			game_object_control.turn_status = DONE
 
 
 class Vanish(Control):

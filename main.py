@@ -27,7 +27,6 @@ import coll
 ## Constants
 
 KEY_SHOT = pygame.K_q
-#KEY_SHOT = pygame.K_W
 
 DRAW_HITBOX = True
 
@@ -43,32 +42,10 @@ STAGE_FILE = "stage.xml"
 BITMAP_PATH = "data/images/"
 BEHAV_PATH = "data/bullets/"
 SHIP_BITMAP = "data/images/ship.png"
-#SHIP_BITMAP = "data/images/shot_small.png"
 BULLET_BITMAP = "data/images/shot3.png"
 BULLET_NOT_BITMAP = "data/images/shot4.png"
 #BULLET_BITMAP = "data/images/shot_small.png"
 FOE_BITMAP = "data/images/foe.png"
-#FILE = "data/bullets/doud.xml"
-#FILE = "data/bullets/doud_synch.xml"
-#FILE = "data/bullets/doud_directed_rand_smooth.xml"
-#FILE = "data/bullets/doud_circles.xml"
-#FILE = 'data/bullets/struggle.xml'
-#FILE = 'data/bullets/bee.xml'
-#FILE = 'data/bullets/slowdown.xml'
-#FILE = 'data/bullets/beewinder.xml'
-#FILE = 'data/bullets/side_cracker.xml'
-#FILE = 'data/bullets/roll3pos.xml'
-#FILE = 'data/bullets/rollbar.xml'
-FILE = 'data/bullets/keylie_360.xml'
-#FILE = 'data/bullets/double_roll_seeds.xml'
-#FILE = 'data/bullets/[ketsui]_r4_boss_rb_rockets.xml'
-#FILE = 'data/bullets/quad3.xml'
-#FILE = 'data/bullets/roll.xml'
-#FILE = 'data/bullets/4waccel.xml'
-#FILE = 'data/bullets/248shot.xml'
-#FILE = 'data/bullets/bar.xml'
-#FILE = 'data/bullets/[Ikaruga]_r5_vrp.xml'
-#FILE = 'data/bullets/[Progear]_round_3_boss_back_burst.xml'
 
 OUT_LIMIT = 0.2 # out-of-screen is e.g. x > width*(1+OUT_LIMIT)
 
@@ -79,7 +56,7 @@ PLAYER_SPEED = 2.0
 
 FOE_LIFE = 30
 
-NB_LINES = 20 # number of lines for the shot
+NB_LINES = 5 # number of lines for the shot
 
 SCALE = 400 # screen height in game units
 
@@ -87,9 +64,7 @@ bulletml.RANK = 0.5 # difficulty setting, 0 to 1
 
 FPS = 60
 MAX_SKIP = 9
-
-SHOT_TIME = 40
-SHOT_FAST = 1 # in presses every SHOT_TIME frames
+MIN_SKIP = 1
 
 BACKGROUND_COLOR = (.235, .275, .275, 1)
 
@@ -97,6 +72,8 @@ SINUS_LIST = [math.sin(i*math.pi / 1800) for i in range(3601)]
 COSINUS_LIST = [math.cos(i*math.pi / 1800) for i in range(3601)]
 
 SHOT_COLOR = [.425, .475, .475, 1]
+SHOT_WIDTH = 50
+
 #####################
 ## Derived constants
 
@@ -136,11 +113,10 @@ def set_perspective(width, height):
 	glLoadIdentity()
 	fov = 30
 	dist = SCALE*math.tan(math.pi/8)/math.tan(fov*math.pi/360)
-#	gluPerspective(fov, float(width)/height, dist*0.5, dist*1.5)
 	gluPerspective(fov, float(WIDTH)/HEIGHT, dist*0.5, dist*1.5)
 	glMatrixMode(GL_MODELVIEW)
 	glLoadIdentity()
-	glTranslate(0, 0, -dist)#
+	glTranslate(0, 0, -dist)
 
 images = {}
 
@@ -218,8 +194,8 @@ ARRAY_UNTIL = 7
 ARRAY_DIM = 8
 
 ARRAY_STATE_ML = 0
-ARRAY_STATE_DANG = 1
-ARRAY_STATE_NO_DANG = 2
+ARRAY_STATE_NO_DANG = 1
+ARRAY_STATE_DANG = 2
 
 bullet_array = zeros((ARRAY_DIM,array_size),Float)
 
@@ -274,8 +250,9 @@ class Foe(object):
 		else:
 			new_bullet.speed = self.speed
 			
-		bullet_array[:ARRAY_SPEED+1,new_bullet.index] = [self.x,self.y,self.z,new_bullet.direction,new_bullet.speed]
+		bullet_array[:ARRAY_Z+1,new_bullet.index] = [self.x,self.y,self.z]
 		new_bullet.sprite = self.bullet_sprite
+		bullet_array[ARRAY_LIST][new_bullet.index] = new_bullet.sprite.list
 
 
 	def firenoml(self, direction=None, speed=None, new_bullet=None):
@@ -305,8 +282,9 @@ class Foe(object):
 
 		new_bullet.out_time = int(min(time_x,time_y))
 
-		bullet_array[:ARRAY_SPEED+1,new_bullet.index] = [self.x,self.y,self.z+0.00001,new_bullet.direction,new_bullet.speed]
+		bullet_array[:ARRAY_Z+1,new_bullet.index] = [self.x,self.y,self.z+0.00001]
 		new_bullet.sprite = self.bullet_sprite
+		bullet_array[ARRAY_LIST][new_bullet.index] = new_bullet.sprite.list
 
 
 
@@ -326,6 +304,7 @@ class BulletMLFoe(Foe):
 		self.controller = BulletMLController()
 		self.controller.game_object = self
 		self.controller.set_behavior(bulletml_behav)
+		self.wait = 0
 		super(BulletMLFoe, self).__init__()
 
 	def fireml(self, controller, direction=None, speed=None):
@@ -342,15 +321,16 @@ class BulletMLFoe(Foe):
 
 
 	def update(self):
-		self.controller.run()
+		if self.wait > 0:
+			self.wait -= 1
+		else:
+			self.controller.run()
 
 		return super(BulletMLFoe, self).update()
 
 class SimpleBullet(object):
 	def __init__(self):
 		global bullet_array,array_size,array_fill,to_remove_array
-		self.direction = 0
-		self.speed = 1
 		self.index = array_fill
 		array_fill += 1
 		if array_fill == array_size:
@@ -363,34 +343,33 @@ class SimpleBullet(object):
 		bullet_list.append(self)
 		self.sprite = sprite.get_sprite(BULLET_BITMAP)
 		bullet_array[ARRAY_LIST][self.index] = self.sprite.list
-		self.sprite2 = sprite.get_sprite(BULLET_NOT_BITMAP)
 		#self.t = 0
 		#self.sin_spd = random.random() * 0.04
 	
 	def getx(self):
 		return bullet_array[ARRAY_X,self.index]
 	x = property(getx)
+	
 	def gety(self):
 		return bullet_array[ARRAY_Y,self.index]
 	y = property(gety)
+	
 	def getz(self):
 		return bullet_array[ARRAY_Z,self.index]
 	z = property(getz)
+	
+	def getd(self):
+		return bullet_array[ARRAY_DIRECTION][self.index]
+	def setd(self,d):
+		bullet_array[ARRAY_DIRECTION][self.index] = d
+	direction = property(getd,setd)
+	
+	def gets(self):
+		return bullet_array[ARRAY_SPEED][self.index]
+	def sets(self,s):
+		bullet_array[ARRAY_SPEED][self.index] = s	
+	speed = property(gets,sets)
 		
-					
-	def draw(self):
-		#self.t = (self.t+self.sin_spd) % (2*math.pi)
-		glPushMatrix()
-		glColor4f(1.0, 1.0, 1.0, 0.2)
-
-	      	self.x,self.y = bullet_array[:ARRAY_Y+1,self.index]
-
-		glTranslatef(self.x, self.y, 0)#math.sin(self.t)*5)
-		# glRotatef(self.t * 180/math.pi, 0, 0, 1)
-		self.sprite.draw()
-		glPopMatrix()
-		#glTranslatef(-self.x, -self.y, 0)
-
 	def vanish(self):
 		global array_fill
 		
@@ -400,7 +379,10 @@ class SimpleBullet(object):
 			bullet_list.pop()
 		else:
 			bullet_array[:,self.index] = bullet_array[:,array_fill]
-			bullet_list[self.index] = bullet_list.pop()
+			try:
+				bullet_list[self.index] = bullet_list.pop()
+			except:
+				print 'self.index : ' + str(self.index) + ' - array_fill : ' + str(array_fill) + ' - len(bullet_list) : ' + str(len(bullet_list))
 			bullet_list[self.index].index = self.index
 
 		
@@ -410,7 +392,7 @@ class SimpleBulletNoML(SimpleBullet):
 		self.out_time = 0
 		bullet_noml_list.append(self)
 		super(SimpleBulletNoML, self).__init__()
-		bullet_array[ARRAY_STATE][self.index] = ARRAY_STATE_DANG + 0.5
+		bullet_array[ARRAY_STATE][self.index] = ARRAY_STATE_DANG
 
 	def vanish(self):
 		bullet_noml_list.remove(self)
@@ -419,6 +401,7 @@ class SimpleBulletNoML(SimpleBullet):
 
 
 class SimpleBulletML(SimpleBullet):
+	
 
 	def __init__(self, bulletml_behav=None):
 		
@@ -427,8 +410,9 @@ class SimpleBulletML(SimpleBullet):
 		self.controller.game_object = self
 		if bulletml_behav is not None:
 			self.controller.set_behavior(bulletml_behav)
+		self.wait = 0
 		super(SimpleBulletML, self).__init__()
-		bullet_array[ARRAY_STATE][self.index] = ARRAY_STATE_ML + 0.5
+		bullet_array[ARRAY_STATE][self.index] = ARRAY_STATE_ML
 
 	def fireml(self, controller, direction=None, speed=None):
 		new_bullet = SimpleBulletML()
@@ -446,8 +430,9 @@ class SimpleBulletML(SimpleBullet):
 		else:
 			new_bullet.speed = self.speed
 			
-		bullet_array[:ARRAY_SPEED+1,new_bullet.index] = self.x,self.y,self.z+0.0001,new_bullet.direction,new_bullet.speed
+		bullet_array[:ARRAY_Z+1,new_bullet.index] = self.x,self.y,self.z+0.0001
 		new_bullet.sprite = self.sprite
+		bullet_array[ARRAY_LIST][new_bullet.index] = new_bullet.sprite.list
 
 	def firenoml(self, direction=None, speed=None):
 		new_bullet = SimpleBulletNoML()
@@ -477,32 +462,26 @@ class SimpleBulletML(SimpleBullet):
        			time_y = (-UNIT_HEIGHT*(1+OUT_LIMIT) - self.y)/(-COSINUS_LIST[int(10*(new_bullet.direction % 360))]*new_bullet.speed)
 
        		new_bullet.out_time = int(min(time_x,time_y))
-		bullet_array[:ARRAY_SPEED+1,new_bullet.index] = self.x,self.y,self.z,new_bullet.direction,new_bullet.speed
+		bullet_array[:ARRAY_Z+1,new_bullet.index] = self.x,self.y,self.z
 		new_bullet.sprite = self.sprite
+		bullet_array[ARRAY_LIST][new_bullet.index] = new_bullet.sprite.list
 
 	def update(self):
-		
-		self.controller.run()
+		if self.wait > 0:
+			self.wait -= 1
+		else:
+			self.controller.run()
 
 		if self.to_remove:
 			return self
-		else:
-			bullet_array[ARRAY_DIRECTION:ARRAY_SPEED+1,self.index] = self.direction % 360, self.speed
 
 		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
 		       self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT):
 			self.vanish()
-			return self
-			
-		#for player in player_list:
-		#	if max(abs(self.x - player.x),abs(self.y - player.y)) <= RADIUS:
-		#		player.vanish()
-		#		self.vanish()
 
 		return self	
 
 
-SHOT_WIDTH = 50
 
 class Shot:
 
@@ -538,8 +517,6 @@ class Shot:
 		ypos *= ypos
 		yneg *= yneg
 		
-		#print (str(xpos) + ' - ' + str(xneg) + ' - ' + str(ypos) + ' - ' + str(yneg))
-
 		choix = random.random()*(xpos + xneg + ypos + yneg)
 
 		shot_dist = math.sqrt(dist)/2
@@ -558,7 +535,6 @@ class Shot:
 		return self
 	
 	def draw(self):
-		#glPushMatrix()
 
 		if len(self.lines) > NB_LINES:
 			self.lines.pop(0)
@@ -592,11 +568,6 @@ class Shot:
 		shot_list.remove(self)
 		self.to_remove = True
 
-
-SHOT_NO = 0
-SHOT_LOW = 1
-SHOT_HIGH = 5
-
 class Player:
 	def update(self):
 		keys = pygame.key.get_pressed()
@@ -621,8 +592,7 @@ class Player:
 			else:
 				bullet.out_time -= 1
 
-		res = coll.coll(bullet_array,array_fill,self.x,self.y,42)
-		#!TODO : Works only for one player
+		res = coll.coll(bullet_array,array_fill,self.x,self.y,len(player_list))
 		if res >= 0:
 			self.vanish()
 			bullet_list[res].vanish()
@@ -644,55 +614,6 @@ class Player:
 
 
 		return self
-		# "front montant"
-		#shot_pressed = (not self.last_shot_pressed) and keys[KEY_SHOT]
-		#self.last_shot_pressed = keys[KEY_SHOT]
-		
-		# find shot_state
-		# if self.shot_state == 0:
-		#	if shot_pressed:
-		#		self.to_next_shot_limit = SHOT_TIME
-		#		self.shot_count = 0
-		#		self.last_shot_state = 0
-		#		self.shot_state = 1
-		#else:
-		#	if self.to_next_shot_limit <= 0:
-		#		# we have to decide the next firepower
-		#		if self.shot_count >= self.shot_state:
-		#			self.last_shot_state = self.shot_state
-		#			if self.shot_state < SHOT_HIGH:
-		#				self.shot_state += 1
-		#		elif self.shot_count > 0:
-		#			# statu quo
-		#			self.last_shot_state = self.shot_state
-		#		else:
-		#			if self.last_shot_state >= self.shot_state:
-		#				self.last_shot_state = self.shot_state
-		#				if self.shot_state > 1:
-		#					self.shot_state -= 1
-		#				else:
-		#					if self.shot_count > 0:
-		#						self.last_shot_state = 1 # staying in LOW anyway
-		#					else:
-		#						self.shot_state = SHOT_NO
-		#			else:
-		#				self.last_shot_state = self.shot_state
-		#		self.to_next_shot_limit = SHOT_TIME
-		#		self.shot_count = 0
-		#		if shot_pressed:
-		#			self.shot_count = 1
-		#	else:
-		#		if shot_pressed:
-		#			self.shot_count += 1
-		#		self.to_next_shot_limit -= 1
-
-		#print "state ", self.shot_state, " for ", self.to_next_shot_limit, " (", self.shot_count, ") [", \
-		#	shot_pressed, "]"
-		#global BACKGROUND_COLOR
-#		#BACKGROUND_COLOR = ( 50* self.shot_state, 50* self.shot_state, 50* self.shot_state )
-
-		#TODO: show it !
-								
 
 	def __init__(self):
 		self.x = 0.0
@@ -701,11 +622,6 @@ class Player:
 		update_list.append(self)
 		player_list.append(self)
 		self.to_remove = False
-		self.shot_state = SHOT_NO
-		self.to_next_shot_limit = 0
-		self.last_shot_pressed = False
-		self.shot_pressed = False
-		self.shot_count = 0
 
 		self.sprite = sprite.get_sprite(SHIP_BITMAP)
 
@@ -744,10 +660,6 @@ class Player:
 					glVertex2f(self.x, self.y)
 					glEnd()
 			glColor4f(1.0, 1.0, 1.0, 1.0)
-		#if DRAW_HITBOX and FONKY_LINES:
-		#	pygame.draw.circle(screen, FONKY_COLOR, (int(self.x), int(self.y)), int(RADIUS))
-
-		
 
 		glPushMatrix()
 		glTranslatef(self.x, self.y, 0)
@@ -773,9 +685,8 @@ class Stage:
 
 	def update(self):
 		while (self.foe_list and self.foe_list[0].frame == self.frame):
-			foe = self.foe_list[0]
+			foe = self.foe_list.pop(0)
 			self.launch(foe.behav,foe.x,foe.y,foe.sprite,foe.bullet)
-			self.foe_list.remove(foe)
 		self.frame += 1
 
 	def launch(self,foe_controller,x,y,foe_bit,bullet_bit):
@@ -809,6 +720,10 @@ def get_turn_actions():
 		next_ticks = new_ticks + 1000/FPS
 		fskip = 0
 		return 2
+	elif fskip < MIN_SKIP:
+		next_ticks = new_ticks + 1000/FPS
+		fskip += 1
+		return 2	
 	else:
 		skip_c += 1
 		fskip += 1
@@ -825,9 +740,6 @@ def main():
 	vframe = 0
 	max_ob = 0
 	Player()
-#	SimpleBulletML(FILE)
-#	Foe()
-#	BulletMLFoe(FILE)
 	stage = Stage()
 	first_fps = first_ticks
 	frame_loc = 0
