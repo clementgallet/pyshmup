@@ -4,12 +4,11 @@ import random
 import logging
 import re
 import xml.sax, xml.sax.handler
-import copy
 import math
 
-import traceback
-
 RANK = 1.0
+
+
 
 ############
 ## Logging
@@ -24,11 +23,7 @@ if __name__ == '__main__':
 l = logging.getLogger('bulletml')
 l.setLevel( logging.DEBUG )
 
-#principe :
 
-#  parcours SAX du fichier xml
-#  creation des objets par appel aux constructeurs respectifs (voire constructeur minimal puis compsition) puis enregistrement en factory pour tous les objets référençables. en effet, une formule (ou Value) peut très bien instancée directement, puisque qu'elle sera stockée dans un état neutre dans les éléments de la factory
-#  on "instancie" ensuite les objets effectivement utilisés par un appel à la Factory correspondante (avec son label)
 
 
 #######################
@@ -56,9 +51,8 @@ def get_bullet(namespace, label):
 ## (reflecting BulletML elements)
 
 # run() status codes
-WAIT = 0 # returned by Wait
-CONTINUE = 1 # action is not yet finished
-DONE = 2
+NOT_DONE = 1 # action is not yet finished
+DONE = 2     # action is finished
 # those are communicated via game_object_control.turn_status
 
 class Cookie:
@@ -117,7 +111,7 @@ class Action(Control):
 			if cookie.current_index >= self.sub_length:
 				game_object_control.turn_status = DONE
 			else:
-				game_object_control.turn_status = CONTINUE
+				game_object_control.turn_status = NOT_DONE
 
 
 class Fire(Control):
@@ -238,7 +232,7 @@ class ChangeDirection(Control):
 			cookie.frame += 1
 			game_object_control.game_object.direction = cookie.initial_direction + \
 			   (float(cookie.frame) / cookie.term) * cookie.direction_offset
-			game_object_control.turn_status =  CONTINUE
+			game_object_control.turn_status =  NOT_DONE
 
 
 class ChangeSpeed(Control):
@@ -270,7 +264,7 @@ class ChangeSpeed(Control):
 			cookie.frame += 1
 			game_object_control.game_object.speed = \
 			       cookie.get_new_speed(game_object_control, cookie)
-			game_object_control.turn_status = CONTINUE
+			game_object_control.turn_status = NOT_DONE
 
 
 	def get_new_speed_absolute(self, game_object_control, cookie):
@@ -313,7 +307,7 @@ class Accel(Control):
 			game_object_control.turn_status = DONE
 		else:
 			cookie.frame += 1
-			game_object_control.turn_status = CONTINUE
+			game_object_control.turn_status = NOT_DONE
 			if not (cookie.horiz or cookie.vert):
 				return
 			initial_speed = game_object_control.game_object.speed
@@ -354,7 +348,7 @@ class Wait(Control):
 		if cookie.new:
 			cookie.new = False
 			game_object_control.game_object.wait = self.term_value.get(cookie)
-			game_object_control.turn_status = WAIT
+			game_object_control.turn_status = NOT_DONE
 		else:	
 			game_object_control.turn_status = DONE
 
@@ -386,7 +380,7 @@ class Repeat(Control):
 				if cookie.repetition != cookie.times:
 					cookie.subcookies[self.actionref].new = True
 					self.run(game_object_control, cookie)
-			game_object_control.turn_status = CONTINUE
+			game_object_control.turn_status = NOT_DONE
 
 
 
