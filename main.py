@@ -21,7 +21,8 @@ from Numeric import *
 import draw
 import coll
 
-#import profile
+#import hotshot
+import sys
 
 #############
 ## Constants
@@ -67,6 +68,7 @@ MAX_SKIP = 9
 MIN_SKIP = 1
 
 BACKGROUND_COLOR = (.235, .275, .275, 1)
+BACKGROUND_COLOR = (0, 0, 0, 1)
 
 SINUS_LIST = [math.sin(i*math.pi / 1800) for i in range(3601)]
 COSINUS_LIST = [math.cos(i*math.pi / 1800) for i in range(3601)]
@@ -105,7 +107,8 @@ l.setLevel(logging.DEBUG)
 
 def set_perspective(width, height):
 	global screen
-	screen = pygame.display.set_mode( (width, height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE )
+	screen = pygame.display.set_mode( (width, height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE, 24)
+	glClear(GL_ACCUM_BUFFER_BIT)
 
 	glViewport(0, 0, width, height)
 
@@ -157,10 +160,19 @@ def init_sdl():
 		if count < failed:
 			l.warning("Some SDL modules failed to initialize.")
 
+	pygame.display.gl_set_attribute(pygame.GL_ACCUM_RED_SIZE, 8)
+	pygame.display.gl_set_attribute(pygame.GL_ACCUM_GREEN_SIZE, 8)
+	pygame.display.gl_set_attribute(pygame.GL_ACCUM_BLUE_SIZE, 8)
+	pygame.display.gl_set_attribute(pygame.GL_ACCUM_ALPHA_SIZE, 8)
+
+
 	global screen
 	screen = pygame.display.set_mode( (WIDTH,HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE )
 
 	set_perspective(WIDTH, HEIGHT)
+
+	glClearAccum(0,0,0,0)
+	glClear(GL_ACCUM_BUFFER_BIT)
 
 	glClearColor(*BACKGROUND_COLOR)
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE)#MINUS_SRC_ALPHA)
@@ -746,8 +758,6 @@ def main():
 #	while bullet_list or foe_list:
 	while pygame.time.get_ticks() < 50000:
 
-		frame_loc += 1
-
 		if pygame.time.get_ticks() - first_fps >= 1000:
 			pygame.display.set_caption("FIVE TONS OF FLAX ! - fps : " + str(frame_loc))
 			first_fps = pygame.time.get_ticks()
@@ -789,6 +799,8 @@ def main():
 		  bullet_array[ARRAY_Y]) 
 
 		if turn_actions >= 2:
+			frame_loc += 1
+
 			vframe += 1
 			for object in player_list:
 				object.draw()
@@ -797,6 +809,10 @@ def main():
 			for object in shot_list:
 				object.draw()
 			draw.draw(bullet_array,array_fill)
+			glAccum(GL_MULT, 0.9)
+			glAccum(GL_ACCUM, 1.0)
+			glAccum(GL_RETURN, 1.0)
+			
 			pygame.display.flip()
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 		frame += 1
@@ -809,4 +825,7 @@ def main():
 #profile.run('main()','prof.txt')
 
 if __name__ == '__main__':
-	main()
+	try:
+		hotshot.Profile("prof").runcall(main)
+	except NameError:
+		main()
