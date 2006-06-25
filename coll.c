@@ -1,5 +1,5 @@
-#include <python2.3/Python.h>
-#include <python2.3/Numeric/arrayobject.h>
+#include <Python.h>
+#include <Numeric/arrayobject.h>
 #include <math.h>
 #include <stdio.h>
 
@@ -150,7 +150,7 @@ static PyObject *coll(PyObject *self, PyObject *args)
 }
 
 static PyMethodDef DrawMethods[] = {
-	{"coll", coll, METH_VARARGS, "Search for colisions"},
+	{"coll", coll, METH_VARARGS, "Search for collisions"},
 	{NULL, NULL, 0, NULL}
 };
 

@@ -1,5 +1,5 @@
-#include <python2.3/Python.h>
-#include <python2.3/Numeric/arrayobject.h>
+#include <Python.h>
+#include <Numeric/arrayobject.h>
 #include <GL/gl.h>
 #define ARRAY_X 0
 #define ARRAY_Y 1
