@@ -7,7 +7,7 @@
 <bullet>shot.png</bullet>
 <sprite>foe.png</sprite>
 </foe>
-<foe>
+<!--<foe>
 <behav>th.xml</behav>
 <x>-100</x>
 <y>45</y>
@@ -22,6 +22,6 @@
 <frame>0</frame>
 <bullet>shot3.png</bullet>
 <sprite>foe.png</sprite>
-</foe>
+</foe>-->
 </stage>
 
