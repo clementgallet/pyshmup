@@ -1,19 +1,19 @@
 
 class Shot:
 
-	def __init__(self):
+	def __init__(self, context):
 
 		self.x = 0
 		self.y = 0
 		self.lines = []
 
-		shot_list.append(self)
-		update_list.append(self)
+		context.shot_list.append(self)
+		context.update_list.append(self)
 		
 		self.to_remove = False
 		self.aimed_foe = None
 		
-
+		self._context = context
 		
 	def update(self):
 

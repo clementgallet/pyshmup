@@ -1,87 +1,68 @@
 import logging
 import copy
+import xml.dom.minidom
 
 from constants import *
-from globals import *
 
 from foe import BulletMLFoe
 import sprite
 
 l = logging.getLogger('stage')
-l.setLevel( logging.DEBUG )
+l.setLevel(logging.DEBUG)
 
-class FoeInfo(object):
+class StageLoader(object):
+	"""
+	Stores information about a stage, and can spawn objects in time.
 
-	behav = None
-	x = 0
-	y = 0
-	frame = 0
-	bullet = None
-	sprite = None
+	There is no way to cleanly "remove" a stage.
+	"""
 
-class Stage(object):
-	def __init__(self, stage_file):
-		self.foe_list = copy.deepcopy(StagetoFoeList(stage_file).getFoes())
+	to_remove = False
+	
+	def __init__(self, context, stage_file=None):
+		self._context = context
+		if stage_file is not None:
+			self.load(stage_file)
 		self.frame = 0
+		self.launch_list = []
 
 	def update(self):
-		while (self.foe_list and self.foe_list[0].frame == self.frame):
-			foe = self.foe_list.pop(0)
-			self.launch(foe.behav,foe.x,foe.y,foe.sprite,foe.bullet)
-		self.frame += 1
+		"""
+		Advance the stage by a frame.
 
-	def launch(self,foe_controller,x,y,foe_bit,bullet_bit):
-		foe = BulletMLFoe(BEHAV_PATH + foe_controller)
-		foe.x = x
-		foe.y = y
-		if foe_bit is not None:
-			foe.sprite = sprite.get_sprite(BITMAP_PATH + foe_bit)
-		else:
-			foe.sprite = sprite.get_sprite(FOE_BITMAP)
-		if bullet_bit is not None:
-			foe.bullet_sprite = sprite.get_sprite(BITMAP_PATH + bullet_bit)
-		else:
-			foe.bullet_sprite = sprite.get_sprite(BULLET_BITMAP)
+		This function populates the game context as needed (ie. spawns
+		objects as they are meant to come).
+		"""
+		while (self.launch_list and self.launch_list[0].frame <= self._context.frame):
+			obj = self.launch_list.pop(0)
+		return self
 
-class StagetoFoeList(object):
+	def load(self, stage_file):
+		"""
+		Load the stage contents from a stage file.
+		"""
+		print [stage_file]
+		doc =  xml.dom.minidom.parse(stage_file)
+		root = doc.documentElement
 
-	root = None
-	foe_list = []
+		launch_list = []
 
-	def __init__(self,FILE):
-		self.file = FILE
-		from xml.dom.minidom import parse
-		self.doc = parse(self.file)
-		self.root = self.doc.documentElement
-
-	def getFoes(self):
-
-		#if self.foe_list is not None:
-		#	return self.foe_list
-
-		#self.foe_list = []
-
-		for foe in self.root.getElementsByTagName("foe"):
-
-			#if foe.nodeType == foe.ELEMENT_NODE:
-				
-			f = FoeInfo()
-
-			for xml in ['behav','bullet','sprite']:
-
-				try:
-					f.__setattr__(xml,foe.getElementsByTagName(xml)[0].childNodes[0].nodeValue)
-				except:
-					l.warning(xml + ' missing')
-
-			for value in ['x','y','frame']:
-
-				try:
-					f.__setattr__(value,eval(foe.getElementsByTagName(value)[0].childNodes[0].nodeValue))
-				except:
-					l.warning(value + ' missing')
-
-			self.foe_list.append(f)
+		for foe_node in root.getElementsByTagName("foe"):
+			behav_name = foe_node.getElementsByTagName('behav')[0].childNodes[0].nodeValue
+			bullet_name = foe_node.getElementsByTagName('bullet')[0].childNodes[0].nodeValue
+			sprite_name = foe_node.getElementsByTagName('sprite')[0].childNodes[0].nodeValue
+			x = eval(foe_node.getElementsByTagName('x')[0].childNodes[0].nodeValue)
+			y = eval(foe_node.getElementsByTagName('y')[0].childNodes[0].nodeValue)
+			frame = eval(foe_node.getElementsByTagName('frame')[0].childNodes[0].nodeValue)
 			
-		return self.foe_list
+			foe = BulletMLFoe(self._context, BEHAV_PATH + behav_name)
+			foe.x = x
+			foe.y = y
+			foe.sprite = sprite.get_sprite(BITMAP_PATH + sprite_name)
+			foe.bullet_sprite = sprite.get_sprite(BITMAP_PATH + bullet_name)
+			launch_list.append(foe)
+
+			
+		self.launch_list = launch_list
+		self._stage_file = stage_file
 

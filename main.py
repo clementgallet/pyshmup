@@ -21,11 +21,11 @@ from pprint import pprint
 ############
 ## Logging
 
-console = logging.StreamHandler( )
-console.setLevel( logging.DEBUG )
-formatter = logging.Formatter( '%(name)-12s: %(levelname)-8s %(message)s' )
-console.setFormatter( formatter )
-logging.getLogger('').addHandler( console )
+console = logging.StreamHandler()
+console.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+console.setFormatter(formatter)
+logging.getLogger('').addHandler(console)
 
 l = logging.getLogger('main')
 l.setLevel(logging.DEBUG)
@@ -43,7 +43,7 @@ def set_perspective(width, height):
 	gl.glMatrixMode(gl.GL_PROJECTION)
 	gl.glLoadIdentity()
 	fov = 30
-	dist = SCALE*math.tan(math.pi/8)/math.tan(fov*math.pi/360)
+	dist = SCALE*math.tan(math.pi/8) / math.tan(fov*math.pi/360)
 	glu.gluPerspective(fov, float(WIDTH)/HEIGHT, dist*0.5, dist*1.5)
 	gl.glMatrixMode(gl.GL_MODELVIEW)
 	gl.glLoadIdentity()
@@ -178,7 +178,7 @@ def main():
 		handle_events(system_state)
 
 		# Calculates next game state
-		game_context.run(system_state)
+		game_context.update(system_state)
 
 		turn_actions = get_turn_actions()
 		if len(game_context.update_list) > max_ob:

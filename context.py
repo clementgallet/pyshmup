@@ -15,8 +15,10 @@ class GameContext(object):
 	Stores, updates, and draws a game state.
 	"""
 	
-	## End of game marker
+	# End of game marker
 	done = False
+
+	frame = 0
 
 	def __init__(self):
 		# lower-level objects are allowed to use thoses structures directly
@@ -41,9 +43,9 @@ class GameContext(object):
 		Create an initial game state from a stage file.
 		"""
 		self.__init__() # reinit
-		self._stage = stage.Stage(stage_name)
+		self.update_list.append(stage.StageLoader(self, stage_name))
 	
-	def run(self, system_state):
+	def update(self, system_state):
 		"""
 		Advance the game state by a frame.
 		"""
@@ -60,8 +62,9 @@ class GameContext(object):
 
 		# Update everything
 		self._move_bullets()
-		self._stage.update()
 		self._update_objects()
+
+		self.frame += 1
 
 	def draw(self):
 		"""
@@ -88,15 +91,15 @@ class GameContext(object):
 		"""
 		Book a slot in the big bullet array, and return its index.
 		"""
-		index = array_fill
-		array_fill += 1
+		index = self.array_fill
+		self.array_fill += 1
 
 		# Grow array
-		if array_fill == array_size:
-			new_array = zeros((ARRAY_DIM,2*array_size),Float)
-			new_array[:,:array_size] = self.bullet_array
+		if self.array_fill == self.array_size:
+			new_array = num.zeros((ARRAY_DIM,2*self.array_size),num.Float)
+			new_array[:,:self.array_size] = self.bullet_array
 			self.bullet_array = new_array
-			array_size *= 2
+			self.array_size *= 2
 		
 		# Calculate time before the bullet is out of screen
 		# (the +10 / -10 on the first line
@@ -131,11 +134,11 @@ class GameContext(object):
 #		bullet_array[ARRAY_UNTIL][index] = 0
 #		bullet_array[ARRAY_LIST][index] = -1
 #		bullet_array[ARRAY_OUT_TIME][index] = out_time
-		bullet_array[:,index] = (x,y,z,direction,speed,display_list,ARRAY_STATE_DANG,0,-1,out_time)
+		self.bullet_array[:,index] = (x,y,z,direction,speed,display_list,ARRAY_STATE_DANG,0,-1,out_time)
 	
 		return index
 	
-	def delete_bullet(index):
+	def delete_bullet(self, index):
 		"""
 		Free a slot in the big bullet array.
 		"""
@@ -176,5 +179,5 @@ class GameContext(object):
 		  self.bullet_array[ARRAY_Y]) 
 
 	def _update_objects(self):
-		self.update_list = [obj for obj in self.update_list if obj.update(self).to_remove == False]
+		self.update_list = [obj for obj in self.update_list if obj.update().to_remove == False]
 	
