@@ -10,6 +10,12 @@ import stage
 
 import draw
 
+from pprint import pprint
+
+import logging
+l = logging.getLogger('context')
+l.setLevel(logging.DEBUG)
+
 class GameContext(object):
 	"""
 	Stores, updates, and draws a game state.
@@ -63,6 +69,8 @@ class GameContext(object):
 		# Update everything
 		self._move_bullets()
 		self._update_objects()
+
+		self._check_array()
 
 		self.frame += 1
 
@@ -151,7 +159,8 @@ class GameContext(object):
 		list_index = int(self.bullet_array[ARRAY_LIST_INDEX, index])
 		if list_index >= 0:
 			# This is a complex bullet
-			bullet_list[list_index].index = index
+			pprint([(x, x.index) for x in self.bullet_list])
+			self.bullet_list[list_index].index = index
 
 
 	###################
@@ -181,3 +190,37 @@ class GameContext(object):
 	def _update_objects(self):
 		self.update_list = [obj for obj in self.update_list if obj.update().to_remove == False]
 	
+
+	## DEBUG
+
+	def _check_array(self):
+		output = []
+		need_output = False
+		for i in range(self.array_fill):
+			if self.bullet_array[ARRAY_LIST_INDEX, i] != -1:
+				index = int(self.bullet_array[ARRAY_LIST_INDEX, i])
+				try:
+					bullet = self.bullet_list[index]
+				except IndexError:
+					need_output = True
+					output.append("LIST_INDEX out of range : it is : %i, length is %i" % (index, len(self.bullet_list)))
+		if need_output:
+			l.error("\n\n\n-----\n\nInvalid array : LIST_INDEX out of range (at frame %i)" % self.frame)
+			for message in output:
+				l.error(message)
+			self._dump_array()
+					
+	def _dump_array(self):
+		l.debug('Soon : the array.')
+		for i in xrange(self.array_fill):
+			l.debug('Array elem %i' % i)
+			l.debug('  X : %f' % self.bullet_array[ARRAY_X, i])
+			l.debug('  Y : %f' % self.bullet_array[ARRAY_Y, i])
+			l.debug('  Z : %f' % self.bullet_array[ARRAY_Z, i])
+			l.debug('  DIRECTION : %f' % self.bullet_array[ARRAY_DIRECTION, i])
+			l.debug('  SPEED : %f' % self.bullet_array[ARRAY_SPEED, i])
+			l.debug('  LIST : %f' % self.bullet_array[ARRAY_LIST, i])
+			l.debug('  STATE : %f' % self.bullet_array[ARRAY_STATE, i])
+			l.debug('  UNTIL : %f' % self.bullet_array[ARRAY_UNTIL, i])
+			l.debug('  LIST_INDEX : %f' % self.bullet_array[ARRAY_LIST_INDEX, i])
+			l.debug('  OUT_TIME : %f' % self.bullet_array[ARRAY_OUT_TIME, i])
