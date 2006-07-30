@@ -197,9 +197,9 @@ class Fire(Control):
 			main_control.cookie = child_cookie
 
 			if bullet.subactions:
-				main_control.game_object.fireml(main_control, numeric_direction, numeric_speed)
+				main_control.game_object.fire_complex(main_control, numeric_direction, numeric_speed)
 			else:
-				main_control.game_object.firenoml(numeric_direction, numeric_speed)
+				main_control.game_object.fire(numeric_direction, numeric_speed)
 
 
 			game_object_control.last_speed = numeric_speed

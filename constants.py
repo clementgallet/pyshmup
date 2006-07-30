@@ -41,7 +41,7 @@ BEHAV_PATH    = "data/bullets/"
 SHIP_BITMAP   = "data/images/ship.png"
 BULLET_BITMAP = "data/images/shot3.png"
 FOE_BITMAP    = "data/images/foe.png"
-STAGE_FILE    = "stage2.xml"
+STAGE_FILE    = "stage.xml"
 
 
 # Numeric array rows
@@ -92,10 +92,10 @@ NB_LINES = 5 # number of lines for the shot
 # Keys
 
 KEY_SHOT = pygame.K_q
-KEY_LEFT = pygame.K_LEFT
-KEY_RIGHT = pygame.K_RIGHT
-KEY_UP = pygame.K_UP
-KEY_DOWN = pygame.K_DOWN
+KEY_LEFT = pygame.K_j
+KEY_RIGHT = pygame.K_l
+KEY_UP = pygame.K_i
+KEY_DOWN = pygame.K_k
 JOY_SHOT = 0
 
 DRAW_HITBOX = True

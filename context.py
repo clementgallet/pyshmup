@@ -85,9 +85,9 @@ class GameContext(object):
 		for object in self.player_list + self.foe_list + self.shot_list:
 			object.draw()
 		draw.draw(self.bullet_array, self.array_fill)
-#		glAccum(GL_MULT, 0.9)
-#		glAccum(GL_ACCUM, 1.0)
-#		glAccum(GL_RETURN, 1.0)
+#		gl.glAccum(gl.GL_MULT, 0.9)
+#		gl.glAccum(gl.GL_ACCUM, 1.0)
+#		gl.glAccum(gl.GL_RETURN, 1.0)
 		
 		pygame.display.flip()
 		gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
@@ -140,7 +140,7 @@ class GameContext(object):
 #		bullet_array[ARRAY_LIST][index] = display_list
 #		bullet_array[ARRAY_STATE][index] = ARRAY_STATE_DANG
 #		bullet_array[ARRAY_UNTIL][index] = 0
-#		bullet_array[ARRAY_LIST][index] = -1
+#		bullet_array[ARRAY_LIST_INDEX][index] = -1
 #		bullet_array[ARRAY_OUT_TIME][index] = out_time
 		self.bullet_array[:,index] = (x,y,z,direction,speed,display_list,ARRAY_STATE_DANG,0,-1,out_time)
 	
@@ -150,16 +150,28 @@ class GameContext(object):
 		"""
 		Free a slot in the big bullet array.
 		"""
+		list_index = int(self.bullet_array[ARRAY_LIST_INDEX,index])
+		
+		# Removing bullet from list
+
+		if list_index >= 0:
+			# This is a complex bullet
+
+			self.bullet_array[ARRAY_LIST_INDEX,self.bullet_list[-1].index] = list_index
+			self.bullet_list[list_index] = self.bullet_list[-1]
+
+			self.bullet_list.pop()
+			self.bullet_list_length -= 1
+		
 		# Decrease size and fill emptied slot
 		self.array_fill -= 1
 		if self.array_fill != index:
 			self.bullet_array[:, index] = self.bullet_array[:, self.array_fill]
 
-		# Bullet list index stored in array
-		list_index = int(self.bullet_array[ARRAY_LIST_INDEX, index])
+		list_index = int(self.bullet_array[ARRAY_LIST_INDEX,index])
 		if list_index >= 0:
 			# This is a complex bullet
-			pprint([(x, x.index) for x in self.bullet_list])
+			#pprint([(x, x.index) for x in self.bullet_list])
 			self.bullet_list[list_index].index = index
 
 	###################

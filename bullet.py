@@ -6,18 +6,33 @@ import sprite
 from pprint import pprint
 	
 
-class SimpleBullet(object):
-	to_remove = False
-	def __init__(self, context):
-		global bullet_list_length
+class SimpleBulletML(object):
 
+	to_remove = False
+
+	def __init__(self, context, bulletml_behav=None):
+	
+		global bullet_list_length
+		
+		self._context = context
+		
+		context.update_list.append(self)
 		context.bullet_list.append(self)
 		context.bullet_list_length += 1
+		
+		self.controller = BulletMLController()
+		self.controller.game_object = self
+		if bulletml_behav is not None:
+			self.controller.set_behavior(bulletml_behav)
+		
+		self.wait = 0
 
 		self.sprite = sprite.get_sprite(BULLET_BITMAP)
 
 		self.index = context.create_bullet(0, 0, 0, 0, 0, self.sprite.list)
-		context.bullet_array[ARRAY_LIST_INDEX, self.index] = context.bullet_list_length - 1
+		
+		context.bullet_array[ARRAY_LIST_INDEX][self.index] = context.bullet_list_length - 1
+		context.bullet_array[ARRAY_STATE][self.index] = ARRAY_STATE_ML
 	
 	def getx(self):
 		return self._context.bullet_array[ARRAY_X,self.index]
@@ -49,35 +64,12 @@ class SimpleBullet(object):
 
 		self._context.delete_bullet(self.index)
 
-		self._context.bullet_list[int(self._context.bullet_array[ARRAY_LIST_INDEX,self.index])] = self._context.bullet_list[-1]
-		self._context.bullet_array[ARRAY_LIST_INDEX,self.index] = self.index
 
-		self._context.bullet_list.pop()
-		self._context.bullet_list_length -= 1
-
-
-
-class SimpleBulletML(SimpleBullet):
-	
-
-	def __init__(self, context, bulletml_behav=None):
-		self._context = context
-		
-		context.update_list.append(self)
-		self.controller = BulletMLController()
-		self.controller.game_object = self
-		if bulletml_behav is not None:
-			self.controller.set_behavior(bulletml_behav)
-		self.wait = 0
-		super(SimpleBulletML, self).__init__(context)
-		context.bullet_array[ARRAY_STATE][self.index] = ARRAY_STATE_ML
-
-	def fireml(self, controller, direction=None, speed=None):
+	def fire_complex(self, controller, direction=None, speed=None):
 		new_bullet = SimpleBulletML()
 		new_bullet.controller = controller
 		controller.set_game_object(new_bullet)
 		new_bullet.aimed_player = self.aimed_player
-
 
 		if direction is not None:
 			new_bullet.direction = direction
@@ -92,7 +84,7 @@ class SimpleBulletML(SimpleBullet):
 		new_bullet.sprite = self.sprite
 		bullet_array[ARRAY_LIST][new_bullet.index] = new_bullet.sprite.list
 
-	def firenoml(self, direction=None, speed=None):
+	def fire(self, direction=None, speed=None):
 		if direction is None:
 			direction = self.direction
 		if speed is None:
@@ -119,6 +111,7 @@ class SimpleBulletML(SimpleBullet):
 			pprint(self)
 			pprint(self._context.update_list)
 			print "\n---------\n\n"
+			#pass
 
 		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
 		       self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT):
