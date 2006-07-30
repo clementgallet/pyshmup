@@ -83,6 +83,11 @@ def init_sdl():
 		except Exception, ex:
 			l.error("Mixer failed to init : " + str(ex))
 			l.error("Disabling sound system.")
+			count += 1	
+		try: pygame.joystick.init()
+		except Exception, ex:
+			l.error("Joystick failed to init : " + str(ex))
+			l.error("Disabling joystick system.")
 			count += 1
 
 		if count < failed:
@@ -111,6 +116,14 @@ def init_sdl():
 	pygame.display.set_caption("FIVE TONS OF FLAX !")
 	
 
+	for i in range(pygame.joystick.get_count()):
+		joy = pygame.joystick.Joystick(i)
+		print 'find joystick : ' + joy.get_name()
+		print 'initialising joystick'
+		joy.init()
+		if joy.get_numaxes() < 2:
+			print 'not enough axes, disabling joystick'
+			joy.quit()
 
 
 fskip = 0
@@ -181,9 +194,8 @@ def main():
 		game_context.update(system_state)
 
 		turn_actions = get_turn_actions()
-		if len(game_context.update_list) > max_ob:
-			max_ob = len(game_context.update_list)
-
+		if game_context.bullet_list_length + game_context.array_fill > max_ob:
+			max_ob = game_context.bullet_list_length + game_context.array_fill
 		if turn_actions >= 2:
 			frame_loc += 1
 			vframe += 1
@@ -194,8 +206,6 @@ def main():
 	l.info("Graphical fps : " + str(float(vframe)/(pygame.time.get_ticks()-first_ticks)*1000))
 	l.info( str(skip_c) + " skips")
 	l.info( "max objects # : " + str(max_ob))
-
-#profile.run('main()','prof.txt')
 
 if __name__ == '__main__':
 	try:

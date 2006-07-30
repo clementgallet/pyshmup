@@ -70,7 +70,7 @@ class GameContext(object):
 		self._move_bullets()
 		self._update_objects()
 
-		self._check_array()
+		#self._check_array()
 
 		self.frame += 1
 
@@ -161,7 +161,6 @@ class GameContext(object):
 			# This is a complex bullet
 			pprint([(x, x.index) for x in self.bullet_list])
 			self.bullet_list[list_index].index = index
-
 
 	###################
 	# Internal methods

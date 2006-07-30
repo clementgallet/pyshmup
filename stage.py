@@ -21,10 +21,10 @@ class StageLoader(object):
 	
 	def __init__(self, context, stage_file=None):
 		self._context = context
+		self.launch_list = []
 		if stage_file is not None:
 			self.load(stage_file)
-		self.frame = 0
-		self.launch_list = []
+#		self.frame = 0
 
 	def update(self):
 		"""
@@ -33,8 +33,10 @@ class StageLoader(object):
 		This function populates the game context as needed (ie. spawns
 		objects as they are meant to come).
 		"""
+
 		while (self.launch_list and self.launch_list[0].frame <= self._context.frame):
 			obj = self.launch_list.pop(0)
+			obj.spawn(self._context)
 		return self
 
 	def load(self, stage_file):
@@ -55,11 +57,12 @@ class StageLoader(object):
 			y = eval(foe_node.getElementsByTagName('y')[0].childNodes[0].nodeValue)
 			frame = eval(foe_node.getElementsByTagName('frame')[0].childNodes[0].nodeValue)
 			
-			foe = BulletMLFoe(self._context, BEHAV_PATH + behav_name)
+			foe = BulletMLFoe(BEHAV_PATH + behav_name)
 			foe.x = x
 			foe.y = y
 			foe.sprite = sprite.get_sprite(BITMAP_PATH + sprite_name)
 			foe.bullet_sprite = sprite.get_sprite(BITMAP_PATH + bullet_name)
+			foe.frame = frame
 			launch_list.append(foe)
 
 			

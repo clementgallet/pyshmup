@@ -4,13 +4,17 @@
   <y>200</y>
   <frame>0</frame>
   <behav>s_aim.xml</behav>
- </foe>
+  <bullet>shot2.png</bullet>
+  <sprite>foe.png</sprite>
+</foe>
 
  <foe>
   <x>-100</x>
   <y>200</y>
   <frame>50</frame>
   <behav>s_aim.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -18,6 +22,8 @@
   <y>200</y>
   <frame>100</frame>
   <behav>s_aim.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -25,6 +31,8 @@
   <y>200</y>
   <frame>150</frame>
   <behav>s_aim.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -32,6 +40,8 @@
   <y>200</y>
   <frame>200</frame>
   <behav>s_aim.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -39,6 +49,8 @@
   <y>200</y>
   <frame>250</frame>
   <behav>s_aim.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -46,6 +58,8 @@
   <y>200</y>
   <frame>300</frame>
   <behav>s_aim.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -53,6 +67,8 @@
   <y>200</y>
   <frame>350</frame>
   <behav>s_aim.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -60,6 +76,8 @@
   <y>200</y>
   <frame>400</frame>
   <behav>s_aim.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -67,6 +85,8 @@
   <y>200</y>
   <frame>450</frame>
   <behav>s_aim.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -74,6 +94,8 @@
   <y>200</y>
   <frame>500</frame>
   <behav>s_aim.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -81,6 +103,8 @@
   <y>200</y>
   <frame>550</frame>
   <behav>s_aim.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -88,6 +112,8 @@
   <y>200</y>
   <frame>800</frame>
   <behav>s_turn.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -95,6 +121,8 @@
   <y>200</y>
   <frame>850</frame>
   <behav>s_turn.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -102,6 +130,8 @@
   <y>200</y>
   <frame>900</frame>
   <behav>s_turn.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -109,6 +139,8 @@
   <y>200</y>
   <frame>950</frame>
   <behav>s_turn.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -116,6 +148,8 @@
   <y>200</y>
   <frame>1000</frame>
   <behav>s_turn.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -123,6 +157,8 @@
   <y>200</y>
   <frame>1050</frame>
   <behav>s_turn.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -130,6 +166,8 @@
   <y>200</y>
   <frame>1100</frame>
   <behav>s_turn.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -137,6 +175,8 @@
   <y>200</y>
   <frame>1150</frame>
   <behav>s_turn.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -144,6 +184,8 @@
   <y>200</y>
   <frame>1200</frame>
   <behav>s_turn.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
  <foe>
@@ -151,6 +193,8 @@
   <y>200</y>
   <frame>1250</frame>
   <behav>s_turn.xml</behav>
+  <bullet>shot.png</bullet>
+  <sprite>foe.png</sprite>
  </foe>
 
 </stage>

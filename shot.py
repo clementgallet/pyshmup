@@ -1,3 +1,8 @@
+import random
+import math
+from constants import *
+import OpenGL.GL as gl
+
 
 class Shot:
 
@@ -17,7 +22,7 @@ class Shot:
 		
 	def update(self):
 
-		if not self.aimed_foe in foe_list and not self.to_remove:
+		if not self.aimed_foe in self._context.foe_list and not self.to_remove:
 			self.vanish()
 			return self
 
@@ -59,17 +64,17 @@ class Shot:
 		c = 0
 
 		if taille >= 0:
-			glDisable(GL_TEXTURE_2D)
+			gl.glDisable(gl.GL_TEXTURE_2D)
 			for i in self.lines:
 				(x,y) = i
 				try:
 					pen_x = pen_x
 					SHOT_COLOR[3] = 1 - (float(taille - c) / NB_LINES)
-					glBegin(GL_LINES)
-					glColor4f(*SHOT_COLOR)
-					glVertex2f(x, y)
-					glVertex2f(pen_x, pen_y)
-					glEnd()
+					gl.glBegin(gl.GL_LINES)
+					gl.glColor4f(*SHOT_COLOR)
+					gl.glVertex2f(x, y)
+					gl.glVertex2f(pen_x, pen_y)
+					gl.glEnd()
 				except:
 					pass
 				
@@ -77,9 +82,9 @@ class Shot:
 				pen_y = y
 				
 				c += 1
-			glColor4f(1.0, 1.0, 1.0, 1.0)
+			gl.glColor4f(1.0, 1.0, 1.0, 1.0)
 
 
 	def vanish(self):
-		shot_list.remove(self)
+		self._context.shot_list.remove(self)
 		self.to_remove = True

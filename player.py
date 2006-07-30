@@ -4,8 +4,10 @@ import OpenGL.GL as gl
 import math
 import pygame
 import coll
-
+import random
 import sprite
+
+from shot import Shot
 
 class Player:
 	def __init__(self, context):
@@ -14,6 +16,7 @@ class Player:
 		self.x = 0.0
 		self.y = -UNIT_HEIGHT * .5
 		self.frame = 0
+		self.id = len(context.player_list) # Won't work when a death occurs
 		context.update_list.append(self)
 		context.player_list.append(self)
 		self.to_remove = False
@@ -40,19 +43,31 @@ class Player:
 		self.circle_list = i
 
 		self.t=0
-		
+		try:
+			self.has_joy = pygame.joystick.Joystick(self.id).get_init()
+		except:
+			self.has_joy = False
+	
+		if self.has_joy:
+			self.joy = pygame.joystick.Joystick(self.id)
+
 	def update(self):
-		keys = pygame.key.get_pressed()
 		dx = 0
 		dy = 0
-		if keys[pygame.K_RIGHT]:
-			dx += 1
-		if keys[pygame.K_LEFT]:
-			dx -= 1
-		if keys[pygame.K_UP]:
-			dy += 1
-		if keys[pygame.K_DOWN]:
-			dy -= 1
+		if self.has_joy:
+			dx = self.joy.get_axis(0)
+			dy = -self.joy.get_axis(1)
+		
+		else:
+			keys = pygame.key.get_pressed()
+			if keys[KEY_RIGHT]:
+				dx += 1
+			if keys[KEY_LEFT]:
+				dx -= 1
+			if keys[KEY_UP]:
+				dy += 1
+			if keys[KEY_DOWN]:
+				dy -= 1
 		self.x += dx*PLAYER_SPEED
 		self.y += dy*PLAYER_SPEED
 		self.frame += 1
@@ -85,17 +100,16 @@ class Player:
 		for list_index in vanishing_indices:
 			self._context.bullet_list[int(list_index)].vanish()
 
-
-		if self._context._system_state.keys[KEY_SHOT]:
+		if (self.has_joy and self.joy.get_button(JOY_SHOT)) or self._context._system_state.keys[KEY_SHOT]:
 			
 			foe_aimed_list = []
-			for foe in foe_list:
+			for foe in self._context.foe_list:
 				if foe.y > self.y and abs(foe.x - self.x) < SHOT_WIDTH / 2:
 					foe_aimed_list.append(foe)
 
 			if foe_aimed_list:
 				foe_choosen = random.randint(0,len(foe_aimed_list) - 1)
-				shot = Shot()
+				shot = Shot(self._context)
 				shot.x = self.x
 				shot.y = self.y
 				shot.aimed_foe = foe_aimed_list[foe_choosen]

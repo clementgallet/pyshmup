@@ -11,9 +11,7 @@ from bullet import SimpleBulletML
 
 
 class Foe(object):
-	def __init__(self, context):
-		self._context = context
-
+	def __init__(self):
 		#FIXME: remove these defaults
 		self.x = UNIT_WIDTH*0
 		self.y = UNIT_HEIGHT*0.3
@@ -24,9 +22,14 @@ class Foe(object):
 		self.sprite = sprite.get_sprite( FOE_BITMAP )
 		self.bullet_sprite = sprite.get_sprite( BULLET_BITMAP )
 		self.life = FOE_LIFE
+		self.frame = 0
+
+	def spawn(self,context):
+		self._context = context
 		context.update_list.append(self)
 		context.foe_list.append(self)
-		
+
+
 	def draw(self):
 		glPushMatrix()
 		#TODO: if foe has no target, it becomes transparent
@@ -40,8 +43,8 @@ class Foe(object):
 		self.direction = self.direction % 360
 		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
 		   self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT) or self.life < 0:
-			foe_list.remove(self)
-			self.to_remove = True
+			self.vanish()
+			return self
 		self.x += math.sin(self.direction*math.pi/180)*self.speed
 		self.y -= math.cos(self.direction*math.pi/180)*self.speed
 
@@ -67,17 +70,17 @@ class Foe(object):
 		self._context.bullet_array[ARRAY_LIST,new_bullet.index] = new_bullet.sprite.list
 
 
-	def firenoml(self, direction=None, speed=None, new_bullet=None):
-		self.z -= 0.0001
-		if direction is None:
-			direction = self.direction
-		if speed is None:
-			speed = self.speed
-			
-
-		bullet_array[:ARRAY_Z+1,new_bullet.index] = [self.x,self.y,self.z+0.00001]
-		new_bullet.sprite = self.bullet_sprite
-		bullet_array[ARRAY_LIST][new_bullet.index] = new_bullet.sprite.list
+#	def firenoml(self, direction=None, speed=None, new_bullet=None):
+#		self.z -= 0.0001
+#		if direction is None:
+#			direction = self.direction
+#		if speed is None:
+#			speed = self.speed
+#			
+#
+#		bullet_array[:ARRAY_Z+1,new_bullet.index] = [self.x,self.y,self.z+0.00001]
+#		new_bullet.sprite = self.bullet_sprite
+#		bullet_array[ARRAY_LIST][new_bullet.index] = new_bullet.sprite.list
 
 
 
@@ -87,18 +90,22 @@ class Foe(object):
 
 class BulletMLFoe(Foe):
 	#FIXME: refactor this and SimpleBulletML
-	def __init__(self, context, bulletml_behav):
+	def __init__(self, bulletml_behav):
 
+		self.controller = BulletMLController()
+		self.controller.game_object = self
+		self.controller.set_behavior(bulletml_behav)
+		self.wait = 0
+		super(BulletMLFoe, self).__init__()
+	
+	def spawn(self,context):
 		#FIXME: the first player is always aimed, ahahah !!
 		if context.player_list:
 			self.aimed_player = context.player_list[0]
 		else:
 			self.aimed_player = None
-		self.controller = BulletMLController()
-		self.controller.game_object = self
-		self.controller.set_behavior(bulletml_behav)
-		self.wait = 0
-		super(BulletMLFoe, self).__init__(context)
+		super(BulletMLFoe, self).spawn(context)
+		
 
 	def fireml(self, controller, direction=None, speed=None):
 		new_bullet = SimpleBulletML(self._context)
@@ -114,7 +121,7 @@ class BulletMLFoe(Foe):
 		if speed is None:
 			speed = self.speed
 		
-		create_simple_bullet(self.x, self.y, self.z, direction, speed, self.sprite.list)
+		self._context.create_bullet(self.x, self.y, self.z, direction, speed, self.bullet_sprite.list)
 
 
 	def update(self):
