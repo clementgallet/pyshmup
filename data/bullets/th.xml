@@ -1,6 +1,6 @@
 <bulletml>
  <action label="top">
- <repeat><times>20</times>
+ <repeat><times>10</times>
  <action>
   <repeat><times>40</times>
    <action>

@@ -10,7 +10,7 @@ class SimpleBulletML(object):
 
 	to_remove = False
 
-	def __init__(self, context, bulletml_behav=None):
+	def __init__(self, context):
 	
 		global bullet_list_length
 		
@@ -22,8 +22,6 @@ class SimpleBulletML(object):
 		
 		self.controller = BulletMLController()
 		self.controller.game_object = self
-		if bulletml_behav is not None:
-			self.controller.set_behavior(bulletml_behav)
 		
 		self.wait = 0
 
@@ -66,7 +64,7 @@ class SimpleBulletML(object):
 
 
 	def fire_complex(self, controller, direction=None, speed=None):
-		new_bullet = SimpleBulletML()
+		new_bullet = SimpleBulletML(self._context)
 		new_bullet.controller = controller
 		controller.set_game_object(new_bullet)
 		new_bullet.aimed_player = self.aimed_player
@@ -80,9 +78,9 @@ class SimpleBulletML(object):
 		else:
 			new_bullet.speed = self.speed
 			
-		bullet_array[:ARRAY_Z+1,new_bullet.index] = self.x,self.y,self.z+0.0001
+		self._context.bullet_array[:ARRAY_Z+1,new_bullet.index] = self.x,self.y,self.z+0.0001
 		new_bullet.sprite = self.sprite
-		bullet_array[ARRAY_LIST][new_bullet.index] = new_bullet.sprite.list
+		self._context.bullet_array[ARRAY_LIST][new_bullet.index] = new_bullet.sprite.list
 
 	def fire(self, direction=None, speed=None):
 		if direction is None:

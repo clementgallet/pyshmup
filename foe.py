@@ -55,7 +55,12 @@ class Foe(object):
 		
 		return self
 
-	def fire_complex(self, direction=None, speed=None, new_bullet=None):
+	def fire_complex(self, controller, direction=None, speed=None):
+		
+		new_bullet = SimpleBulletML(self._context)
+		new_bullet.controller = controller
+		controller.set_game_object(new_bullet)
+		new_bullet.aimed_player = self.aimed_player
 		if direction is not None:
 			new_bullet.direction = direction
 		else:
@@ -99,14 +104,6 @@ class BulletMLFoe(Foe):
 		else:
 			self.aimed_player = None
 		super(BulletMLFoe, self).spawn(context)
-		
-
-	def fire_complex(self, controller, direction=None, speed=None):
-		new_bullet = SimpleBulletML(self._context)
-		new_bullet.controller = controller
-		controller.set_game_object(new_bullet)
-		new_bullet.aimed_player = self.aimed_player
-		super(BulletMLFoe, self).fire_complex(direction, speed, new_bullet)
 
 	def update(self):
 		if self.wait > 0:
