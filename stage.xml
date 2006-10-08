@@ -1,8 +1,8 @@
 <stage>
 <foe>
-<behav>mushilike.xml</behav>
-<x>-40</x>
-<y>0</y>
+<behav>arrows.xml</behav>
+<x>0</x>
+<y>100</y>
 <frame>0</frame>
 <bullet>shot.png</bullet>
 <sprite>foe.png</sprite>
@@ -22,7 +22,7 @@
 <frame>0</frame>
 <bullet>shot3.png</bullet>
 <sprite>foe.png</sprite>
-</foe>-->
+</foe>
 <foe>
 <behav>lines.xml</behav>
 <x>0</x>
@@ -30,6 +30,6 @@
 <frame>0</frame>
 <bullet>shot3.png</bullet>
 <sprite>foe.png</sprite>
-</foe>
+</foe>-->
 </stage>
 
