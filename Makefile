@@ -1,4 +1,4 @@
-.PHONY: play all
+.PHONY: play all clean
 
 play:	all
 	python main.py
@@ -16,3 +16,6 @@ constants.h: constants.py
 
 tags:	*.py
 	ctags *.py
+
+clean:
+	$(RM) *.pyc *.pyo constants.h *.so

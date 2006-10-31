@@ -5,11 +5,6 @@
 
 #include "constants.h"
 
-// When the state is at ARRAY_STATE_UNKNOWN,
-// each player put the dangerousness of the bullet toward it, 
-// and raise by one the ARRAY_STATE value
-// until the value ARRAY_STATE_DANG + #(players)
-// so that all the players have treated the bullet state
 
 
 inline double dabs(double x)
@@ -31,7 +26,7 @@ inline int truemod(int x,int n)
 {
 	int y=x%n;
 	if (y<0)
-		y += n;
+		return y+n;
 	return y;
 } 
 
@@ -40,121 +35,94 @@ double COSINUS_LIST[3600];
 
 #define array_elem(type) (*(double *)(array->data + ARRAY_##type*array->strides[0] + i*array->strides[1]))
 
-static PyObject *coll(PyObject *self, PyObject *args)
+/**  Calculate a lower bound on the time before collision 
+ *  why a player for each bullet.
+ *   We assume each player tries his best to die.
+ *   Incidentally, detect collisions.
+ */
+static PyObject *update_collisions(PyObject *self, PyObject *args)
 {
-	double x,y;
-	double rat_x,rat_y;
-	double t_x,t_y;
-	double b_x,b_y;
-	double b_d,b_s;
+	double p_x, p_y; /* player coordinates */
+	double b_x, b_y; /* bullet coordinates */
+	double p_s, p_d; /* player speed and direction */
+	double b_s, b_d; /* bullet speed and direction */
+	double rel_s_x, rel_s_y; /* relative speeds (bullet - player) */
+	int    e_x, e_y; /* approach direction :
+	                      1  : player goes positive  ---->
+								 0  : player does not move    |
+								 -1 : player goes negative  <----
+							  (the player tries to hit the bullet) */
+	double t_x,t_y;  /* time to hit (on each axis) */
+	double t;        /* time to hit (total) */
 
-	int nb_players;
-	int size;
-	int signe_x,signe_y;
+	int p_num;
+
 	int i;
-
-	PyObject *coll_indices = PyList_New(0);
-	PyObject *out_indices = PyList_New(0);
 
 	PyArrayObject *array;
 	PyArg_ParseTuple(args,"O!iddi",&PyArray_Type,&array,&size,&x,&y,&nb_players);
 
 	for (i=0;i<size;i++)
 	{
+		if (array_elem(UNTIL) > 0)
+		{
+			array_elem(UNTIL)--;
+			continue;
+		}
+
+		array_elem(UNTIL) = NEVER;
+
 		b_x = array_elem(X);
 		b_y = array_elem(Y);
+		b_d = array_elem(DIRECTION);
+		b_s = array_elem(SPEED);
 
-		array_elem(OUT_TIME)--;
-		if (array_elem(OUT_TIME) < 0)
-			if (array_elem(LIST_INDEX) <= 0)
-			{
-				PyList_Append(out_indices, Py_BuildValue("i", i));
-				continue;
-			}
+		/* we build t_x and t_y, lower bounds on the time
+		 * till we get a collision between the bullet and
+		 * the player (we assume the player is heading dead on)
+		 */
 
-		/* Check collision for ML bullets */
-		if ((int) array_elem(STATE) == ARRAY_STATE_ML)
-			if ((dabs(b_x - x) < RADIUS) && (dabs(b_y - y)< RADIUS))
-			{
-				PyList_Append(coll_indices, Py_BuildValue("i",i));
-				continue;
-			}
-
+		/* for p_x, p_y, ..... */
 		
-		if ((int) array_elem(STATE) >= ARRAY_STATE_DANG)
+		e_x = (b_x > p_x) ? 1 : (b_x < p_x) ? -1 : 0;
+		e_y = (b_y > p_y) ? 1 : (b_y < p_y) ? -1 : 0;
+
+		rel_s_x = sin(b_d)*b_s - e_x*p_s;
+		rel_s_y = sin(b_d)*b_s - e_y*p_s;
+
+		if (dabs(b_x - p_x) < RADIUS)
+		  t_x = 0;
+		else
+		  t_x = ((b_x - p_x) - e_x*RADIUS)/rel_s_x;
+
+		if (dabs(b_y - p_y) < RADIUS)
+		  t_y = 0;
+		else
+		  t_y = ((b_y - p_y) - e_y*RADIUS)/rel_s_y;
+
+		if (t_x < 0) /* divergent trajectories */
 		{
-				b_d = array_elem(DIRECTION);
-				b_s = array_elem(SPEED);
+			if (t_y < 0) /* doubly so */
+				t = NEVER;
+			else
+				t = t_y;
+		}
+		else
+			t = max(t_x, t_y);
 
-				array_elem(STATE) = (double)(ARRAY_STATE_NO_DANG);
-				if (dabs(b_x - x) > RADIUS)
-				{
-					signe_x = (b_x > x) + (b_x >= x ) - 1;
-					rat_x = SINUS_LIST[truemod(10*b_d, 3600)]*b_s - signe_x*PLAYER_SPEED;
-					if (rat_x != 0)
-					{
-						t_x = (signe_x * RADIUS - b_x + x) / rat_x;
-						if (t_x >= 0 && dabs(x + signe_x * t_x * PLAYER_SPEED) < UNIT_WIDTH)
-						{
-							if (dabs(b_y - y) > RADIUS)
-							{
-								signe_y = (b_y > y) + (b_y >= y) - 1;
-								rat_y = (-1)*COSINUS_LIST[truemod((int)(10*b_d),3600)]*b_s - signe_y * PLAYER_SPEED;
-								if (rat_y != 0)
-								{
-									t_y = (signe_y * RADIUS - b_y + y) / rat_y;
-									if (t_y >= 0)
-									{
-										if ((int) array_elem(STATE) >= ARRAY_STATE_DANG + nb_players - 1) 
-											array_elem(STATE) = (double)(ARRAY_STATE_DANG);
-										else
-											array_elem(STATE)++;
+		array_elem(UNTIL) = min(array_elem(UNTIL), t);
 
-										array_elem(UNTIL) = min(max(t_x, t_y), array_elem(UNTIL));
-									}
-								}
-							}
-							else
-							{
-								if ((int)array_elem(STATE) >= ARRAY_STATE_DANG + nb_players - 1)
-									array_elem(STATE) = (double)(ARRAY_STATE_DANG);
-								else
-									array_elem(STATE)++;
-
-								array_elem(UNTIL) = min(t_x, array_elem(UNTIL));
-							}
-						}
-					}
-				}
-				else if (dabs(b_y - y) > RADIUS)
-				{
-					signe_y = (b_y > y) + (b_y >= y) - 1;
-					rat_y = (-1)*COSINUS_LIST[truemod((int)(10*b_d),3600)]*b_s - signe_y * PLAYER_SPEED;
-					if (rat_y != 0)
-					{
-						t_y = (signe_y * RADIUS - b_y + y) / rat_y;
-						if (t_y >= 0)
-						{
-							if ((int)array_elem(STATE) >= ARRAY_STATE_DANG + nb_players - 1)
-								array_elem(STATE) = (double)(ARRAY_STATE_DANG);
-							else
-								array_elem(STATE)++;
-
-							array_elem(UNTIL) = min(t_y, array_elem(UNTIL));
-						}
-					}
-				}
-				else
-					PyList_Append(coll_indices, Py_BuildValue("i", i));
-			}
-		
+		if (t == 0) /* collision ! */
+			array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) | (1 << p_num);
+		else
+			array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) & (-1 - 1 << p_num);
 	}
-
-	return Py_BuildValue("(OO)", coll_indices, out_indices);
+	
+	return;
 }
 
 static PyMethodDef DrawMethods[] = {
-	{"coll", coll, METH_VARARGS, "Search for collisions"},
+	{"coll", update_collisions, METH_VARARGS, "Search for collisions"},
 	{NULL, NULL, 0, NULL}
 };
 

@@ -78,6 +78,8 @@ class Player:
 		if coll_indices:
 			self.vanish()
 
+		self._context.detect_collision(type = 'bullet', remove = True)
+
 		# By ordering indices in descending order,
 		# we make sure the array indices are still valid
 		# when we look at them

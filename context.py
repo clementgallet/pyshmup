@@ -138,11 +138,10 @@ class GameContext(object):
 #		bullet_array[ARRAY_DIRECTION][index] = direction
 #		bullet_array[ARRAY_SPEED][index] = speed
 #		bullet_array[ARRAY_LIST][index] = display_list
-#		bullet_array[ARRAY_STATE][index] = ARRAY_STATE_DANG
 #		bullet_array[ARRAY_UNTIL][index] = 0
 #		bullet_array[ARRAY_LIST_INDEX][index] = -1
 #		bullet_array[ARRAY_OUT_TIME][index] = out_time
-		self.bullet_array[:,index] = (x,y,z,direction,speed,display_list,ARRAY_STATE_DANG,0,-1,out_time)
+		self.bullet_array[:,index] = (x,y,z,direction,speed,display_list,0,-1,out_time)
 	
 		return index
 	
@@ -199,6 +198,8 @@ class GameContext(object):
 		  self.bullet_array[ARRAY_Y]) 
 
 	def _update_objects(self):
+	   for obj in self.update_list:
+		   obj.update()
 		self.update_list = [obj for obj in self.update_list if obj.update().to_remove == False]
 	
 
@@ -231,7 +232,6 @@ class GameContext(object):
 			l.debug('  DIRECTION : %f' % self.bullet_array[ARRAY_DIRECTION, i])
 			l.debug('  SPEED : %f' % self.bullet_array[ARRAY_SPEED, i])
 			l.debug('  LIST : %f' % self.bullet_array[ARRAY_LIST, i])
-			l.debug('  STATE : %f' % self.bullet_array[ARRAY_STATE, i])
 			l.debug('  UNTIL : %f' % self.bullet_array[ARRAY_UNTIL, i])
 			l.debug('  LIST_INDEX : %f' % self.bullet_array[ARRAY_LIST_INDEX, i])
 			l.debug('  OUT_TIME : %f' % self.bullet_array[ARRAY_OUT_TIME, i])
