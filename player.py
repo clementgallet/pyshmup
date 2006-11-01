@@ -43,66 +43,35 @@ class Player:
 		self.circle_list = i
 
 		self.t=0
-		try:
-			self.has_joy = pygame.joystick.Joystick(self.id).get_init()
-		except:
-			self.has_joy = False
-	
-		if self.has_joy:
-			self.joy = pygame.joystick.Joystick(self.id)
 
 	def update(self):
 		dx = 0
 		dy = 0
-		if self.has_joy:
-			dx = self.joy.get_axis(0)
-			dy = -self.joy.get_axis(1)
-		
-		else:
-			keys = pygame.key.get_pressed()
-			if keys[KEY_RIGHT]:
-				dx += 1
-			if keys[KEY_LEFT]:
-				dx -= 1
-			if keys[KEY_UP]:
-				dy += 1
-			if keys[KEY_DOWN]:
-				dy -= 1
+		keys = self._context._system_state.inputs[self.id]
+		if keys[INDEX_RIGHT]:
+			dx += 1
+		if keys[INDEX_LEFT]:
+			dx -= 1
+		if keys[INDEX_UP]:
+			dy += 1
+		if keys[INDEX_DOWN]:
+			dy -= 1
 		self.x += dx*PLAYER_SPEED
 		self.y += dy*PLAYER_SPEED
 		self.frame += 1
 		
-		# FIXME: this last parameter sadly didn't pass muster
-		coll_indices, out_indices = coll.coll(self._context.bullet_array, \
-		      self._context.array_fill, self.x, self.y, len(self._context.player_list))
-		if coll_indices:
-			self.vanish()
-
-		self._context.detect_collision(type = 'bullet', remove = True)
-
-		# By ordering indices in descending order,
-		# we make sure the array indices are still valid
-		# when we look at them
-		dead_indices = coll_indices + out_indices
-		dead_indices.sort()
-		dead_indices.reverse()
-		vanishing_indices = []
-
-		for array_index in dead_indices:
-			list_index = self._context.bullet_array[ARRAY_LIST_INDEX,array_index]
-			if list_index >= 0:
-				# We do not .vanish() it yet because this might
-				# make another (greater) list_index invalid
-				vanishing_indices.append(list_index)
-			else:
-				self._context.delete_bullet(array_index)
-
-		vanishing_indices.sort()
-		vanishing_indices.reverse()
-		for list_index in vanishing_indices:
-			self._context.bullet_list[int(list_index)].vanish()
-
-		if (self.has_joy and self.joy.get_button(JOY_SHOT)) or self._context._system_state.keys[KEY_SHOT]:
+		for i in reversed(range(self._context.array_fill)):
+			if (self._context.bullet_array[i,ARRAY_COLLIDE] & 1 << self.index):
+				self._context.delete_bullet(i)
+				self.to_remove = True
+		
+		for i in reversed(range(self._context.array_ml_fill)):
+			if (self._context.bullet_array_ml[i,ARRAY_ML_COLLIDE] & 1 << self.index):
+				self._context.bullet_list[i].vanish()
+				self.to_remove = True
+		
+		
+		if keys[INDEX_SHOT]:
 			
 			foe_aimed_list = []
 			for foe in self._context.foe_list:

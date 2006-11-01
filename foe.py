@@ -3,7 +3,7 @@ import math
 
 from constants import *
 
-from OpenGL.GL import *
+import OpenGL.GL as gl
 
 from bulletml import BulletMLController
 import sprite
@@ -31,12 +31,12 @@ class Foe(object):
 
 
 	def draw(self):
-		glPushMatrix()
+		gl.glPushMatrix()
 		#TODO: if foe has no target, it becomes transparent
-		glColor4f(1.0, 1.0, 1.0, 1.0)
-		glTranslatef(self.x, self.y, 0)
+		gl.glColor4f(1.0, 1.0, 1.0, 1.0)
+		gl.glTranslatef(self.x, self.y, 0)
 		self.sprite.draw()
-		glPopMatrix()
+		gl.glPopMatrix()
 
 
 	def update(self):
@@ -61,6 +61,8 @@ class Foe(object):
 		new_bullet.controller = controller
 		controller.set_game_object(new_bullet)
 		new_bullet.aimed_player = self.aimed_player
+		new_bullet.sprite = self.bullet_sprite
+		
 		if direction is not None:
 			new_bullet.direction = direction
 		else:
@@ -69,10 +71,7 @@ class Foe(object):
 			new_bullet.speed = speed
 		else:
 			new_bullet.speed = self.speed
-			
-		self._context.bullet_array[:ARRAY_Z+1,new_bullet.index] = [self.x,self.y,self.z]
-		new_bullet.sprite = self.bullet_sprite
-		self._context.bullet_array[ARRAY_LIST,new_bullet.index] = new_bullet.sprite.list
+		self._context.create_bullet_ml(self.x, self.y, self.z+0.001, new_bullet.direction, new_bullet.speed, self.sprite.list)
 
 
 	def fire(self, direction=None, speed=None):

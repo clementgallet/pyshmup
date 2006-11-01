@@ -9,6 +9,8 @@ import player
 import stage
 
 import draw
+import coll
+import collml
 
 from pprint import pprint
 
@@ -21,16 +23,12 @@ class GameContext(object):
 	Stores, updates, and draws a game state.
 	"""
 	
-	# End of game marker
-	done = False
-
 	frame = 0
 
 	def __init__(self):
 		# lower-level objects are allowed to use thoses structures directly
 		self.update_list = []
 		self.bullet_list = []
-		self.bullet_list_length = 0
 		self.player_list = []
 		self.foe_list = []
 		self.shot_list = []
@@ -39,6 +37,10 @@ class GameContext(object):
 		self.bullet_array = num.zeros((ARRAY_DIM, self.array_size), num.Float)
 		self.array_fill = 0
 
+		self.array_ml_size = 8
+		self.bullet_array_ml = num.zeros((ARRAY_ML_DIM, self.array_ml_size), num.Float)
+		self.array_ml_fill = 0
+		
 		player.Player(self)
 
 	####################################
@@ -59,15 +61,13 @@ class GameContext(object):
 		#print "updating"
 		#return
 
-		# FIXME: move this in a game manager or something (that can do pause and such...)
-		if system_state.keys[pygame.K_ESCAPE]:
-			self.done = True
-
 		# Share current system state with other objects
 		self._system_state = system_state
 
 		# Update everything
 		self._move_bullets()
+		self._out_bounds()
+		self._check_collisons()
 		self._update_objects()
 
 		#self._check_array()
@@ -84,7 +84,7 @@ class GameContext(object):
 
 		for object in self.player_list + self.foe_list + self.shot_list:
 			object.draw()
-		draw.draw(self.bullet_array, self.array_fill)
+		draw.draw(self.bullet_array, self.array_fill,self.bullet_array_ml, self.array_ml_fill)
 #		gl.glAccum(gl.GL_MULT, 0.9)
 #		gl.glAccum(gl.GL_ACCUM, 1.0)
 #		gl.glAccum(gl.GL_RETURN, 1.0)
@@ -139,39 +139,56 @@ class GameContext(object):
 #		bullet_array[ARRAY_SPEED][index] = speed
 #		bullet_array[ARRAY_LIST][index] = display_list
 #		bullet_array[ARRAY_UNTIL][index] = 0
-#		bullet_array[ARRAY_LIST_INDEX][index] = -1
 #		bullet_array[ARRAY_OUT_TIME][index] = out_time
-		self.bullet_array[:,index] = (x,y,z,direction,speed,display_list,0,-1,out_time)
+#		bullet_array[ARRAY_COLLIDE_MASK][index] = 0
+		self.bullet_array[:,index] = (x,y,z,direction,speed,display_list,0,out_time,0)
 	
 		return index
+
+	def create_bullet_ml(self, x, y, z, direction, speed, display_list):
+		"""
+		Book a slot in the big bullet array, and return its index.
+		"""
+		self.array_ml_fill += 1
+
+		# Grow array
+		if self.array_ml_fill == self.array_ml_size:
+			new_array = num.zeros((ARRAY_ML_DIM,2*self.array_ml_size),num.Float)
+			new_array[:,:self.array_ml_size] = self.bullet_array_ml
+			self.bullet_array_ml = new_array
+			self.array_ml_size *= 2
+		
+#		bullet_array_ml[ARRAY_ML_X][index] = x
+#		bullet_array_ml[ARRAY_ML_Y][index] = y
+#		bullet_array_ml[ARRAY_ML_Z][index] = z
+#		bullet_array_ml[ARRAY_ML_DIRECTION][index] = direction
+#		bullet_array_ml[ARRAY_ML_SPEED][index] = speed
+#		bullet_array_ml[ARRAY_ML_LIST][index] = display_list
+#		bullet_array_ml[ARRAY_ML_COLLIDE_MASK][index] = 0
+		self.bullet_array[:,index] = (x,y,z,direction,speed,display_list)
 	
 	def delete_bullet(self, index):
 		"""
 		Free a slot in the big bullet array.
 		"""
-		list_index = int(self.bullet_array[ARRAY_LIST_INDEX,index])
-		
-		# Removing bullet from list
-
-		if list_index >= 0:
-			# This is a complex bullet
-
-			self.bullet_array[ARRAY_LIST_INDEX,self.bullet_list[-1].index] = list_index
-			self.bullet_list[list_index] = self.bullet_list[-1]
-
-			self.bullet_list.pop()
-			self.bullet_list_length -= 1
 		
 		# Decrease size and fill emptied slot
 		self.array_fill -= 1
 		if self.array_fill != index:
 			self.bullet_array[:, index] = self.bullet_array[:, self.array_fill]
 
-		list_index = int(self.bullet_array[ARRAY_LIST_INDEX,index])
-		if list_index >= 0:
-			# This is a complex bullet
-			#pprint([(x, x.index) for x in self.bullet_list])
-			self.bullet_list[list_index].index = index
+	def delete_bullet_ml(self, index):
+		"""
+		Free a slot in the big bullet array.
+		"""
+		
+		# Decrease size and fill emptied slot
+		self.array_ml_fill -= 1
+		bullet = self.bullet_list.pop()
+		if self.array_ml_fill != index:
+			self.bullet_array_ml[:, index] = self.bullet_array_ml[:, self.array_fill]
+			self.bullet_list[index] = bullet
+		
 
 	###################
 	# Internal methods
@@ -197,9 +214,38 @@ class GameContext(object):
 		    self.bullet_array[ARRAY_SPEED]), \
 		  self.bullet_array[ARRAY_Y]) 
 
+		num.add( \
+		  self.bullet_array_ml[ARRAY_ML_X], \
+		  num.multiply( \
+		    num.sin( \
+		      num.multiply( \
+		        self.bullet_array_ml[ARRAY_ML_DIRECTION], \
+		        math.pi/180)), \
+		    self.bullet_array_ml[ARRAY_ML_SPEED]), \
+		  self.bullet_array_ML[ARRAY_ML_X])
+		
+		num.subtract( \
+		  self.bullet_array_ml[ARRAY_ML_Y], \
+		  num.multiply( \
+		    num.cos( \
+		      num.multiply( \
+		        self.bullet_array_ml[ARRAY_ML_DIRECTION], \
+		        math.pi/180)), \
+		    self.bullet_array_ml[ARRAY_ML_SPEED]), \
+		  self.bullet_array_ml[ARRAY_ML_Y]) 
+
+	def _out_bounds(self):
+		num.subtract(self.bullet_array[ARRAY_OUT_TIME],num.ones((self.array_ml_size),num.Float),self.bullet_array[ARRAY_OUT_TIME])
+		for i in reversed(range(self.array_fill)):
+			if self.bullet_array[ARRAY_OUT_TIME] < 0:
+				self.delete_bullet(i)
+
+
+	def _check_collisions(self):
+		coll.coll(self.bullet_array, self.array_fill, self.player_list, len(self.player_list))
+		collml.collml(self.bullet_array_ml, self.array_ml_fill, self.player_list, len(self.player_list))
+
 	def _update_objects(self):
-	   for obj in self.update_list:
-		   obj.update()
 		self.update_list = [obj for obj in self.update_list if obj.update().to_remove == False]
 	
 

@@ -52,17 +52,22 @@ ARRAY_DIRECTION = 3
 ARRAY_SPEED = 4
 ARRAY_LIST = 5
 ARRAY_UNTIL = 6
-ARRAY_LIST_INDEX = 7
-ARRAY_OUT_TIME = 8
-ARRAY_COLLIDE_MASK = 9
-ARRAY_DIM = 10
+ARRAY_OUT_TIME = 7
+ARRAY_COLLIDE_MASK = 8
+ARRAY_DIM = 9
 
-# Bullet dangerousness levels
-ARRAY_STATE_ML = 0      # fairly unpredictable
-ARRAY_STATE_NO_DANG = 1
-ARRAY_STATE_DANG = 2
+# Numeric array ml rows
+ARRAY_ML_X = 0
+ARRAY_ML_Y = 1
+ARRAY_ML_Z = 2
+ARRAY_ML_DIRECTION = 3
+ARRAY_ML_SPEED = 4
+ARRAY_ML_LIST = 5
+ARRAY_ML_COLLIDE_MASK = 6
+ARRAY_ML_DIM = 7
 
 
+PLAYER_NUMBER = 1
 
 
 ####################
@@ -96,7 +101,14 @@ KEY_LEFT = pygame.K_j
 KEY_RIGHT = pygame.K_l
 KEY_UP = pygame.K_i
 KEY_DOWN = pygame.K_k
-JOY_SHOT = 0
+
+# Keys index
+
+INDEX_RIGHT = 0
+INDEX_LEFT = 1
+INDEX_UP = 2
+INDEX_DOWN = 3
+INDEX_SHOT = 4
 
 DRAW_HITBOX = True
 

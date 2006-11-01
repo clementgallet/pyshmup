@@ -84,11 +84,6 @@ def init_sdl():
 			l.error("Mixer failed to init : " + str(ex))
 			l.error("Disabling sound system.")
 			count += 1	
-		try: pygame.joystick.init()
-		except Exception, ex:
-			l.error("Joystick failed to init : " + str(ex))
-			l.error("Disabling joystick system.")
-			count += 1
 
 		if count < failed:
 			l.warning("Some SDL modules failed to initialize.")
@@ -116,18 +111,6 @@ def init_sdl():
 	pygame.display.set_caption("FIVE TONS OF FLAX !")
 	
 
-	for i in range(pygame.joystick.get_count()):
-		joy = pygame.joystick.Joystick(i)
-		print 'find joystick : ' + joy.get_name()
-		print 'initialising joystick'
-		joy.init()
-		if joy.get_numaxes() < 2:
-			print 'not enough axes, disabling joystick'
-			joy.quit()
-
-
-fskip = 0
-next_ticks = 0
 def get_turn_actions():
 	global next_ticks
 	global skip_c, fskip
@@ -136,6 +119,7 @@ def get_turn_actions():
 	new_ticks = pygame.time.get_ticks()
 	if new_ticks <= next_ticks:
 		pygame.time.wait(next_ticks - new_ticks)
+		total_wait_time += next_ticks - new_ticks
 		fskip = 0
 		next_ticks += 1000/FPS
 		return 2
@@ -154,34 +138,57 @@ def get_turn_actions():
 		return 1
 
 def handle_events(system_state):
-	global bullet_list, quit
 	for ev in pygame.event.get():
 		if ev.type == pygame.VIDEORESIZE:
 			set_perspective(ev.w, ev.h)
 		if ev.type == pygame.QUIT:
 			quit = True
-	system_state.keys = pygame.key.get_pressed()
+	keys = pygame.key.get_pressed()
+
+	# Quit
+	if keys[KEY_QUIT]:
+		system_state.quit = True
+
+	# Inputs
+	system_state.inputs[context.id] = (keys[KEY_RIGHT],\
+	                                   keys[KEY_LEFT],\
+	                                   keys[KEY_UP],\
+	                                   keys[KEY_DOWN],\
+	                                   keys[KEY_SHOT])
 
 class SystemState(object):
-	pass
+	def __init__(self):
+		self.inputs = [(0,0,0,0,0) for i in range(PLAYER_NUMBER)]
+		self.quit = False
 
+
+# Globals 
+fskip = 0
+next_ticks = 0
+
+# For statistics
 skip_c = 0
+total_wait_time = 0
+first_ticks = pygame.time.get_ticks()
+
 def main():
-	global update_list,bullet_list
+	global first_ticks
+	
 	init_sdl()
-	x=0
-	first_ticks = pygame.time.get_ticks()
+	
+	# For statistics
 	frame = 0
 	vframe = 0
 	max_ob = 0
 	first_fps = first_ticks
 	frame_loc = 0
-#	while bullet_list or foe_list:
+
 	game_context = context.GameContext()
 	game_context.load_stage(STAGE_FILE)
 	system_state = SystemState()
-	while pygame.time.get_ticks() < 50000 and not game_context.done:
+	while pygame.time.get_ticks() < 50000 and not system_state.quit:
 
+		# Prints fps
 		if pygame.time.get_ticks() - first_fps >= 1000:
 			pygame.display.set_caption("FIVE TONS OF FLAX ! - fps : " + str(frame_loc))
 			first_fps = pygame.time.get_ticks()
@@ -193,15 +200,27 @@ def main():
 		# Calculates next game state
 		game_context.update(system_state)
 
-		turn_actions = get_turn_actions()
+		# Updates max objects
 		if game_context.bullet_list_length + game_context.array_fill > max_ob:
 			max_ob = game_context.bullet_list_length + game_context.array_fill
+		
+		# Wait until end of frame or skip frame
+		turn_actions = get_turn_actions()
 		if turn_actions >= 2:
 			frame_loc += 1
 			vframe += 1
 			game_context.draw()
 		frame += 1
-		
+	
+	total_time = pygame.time.get_ticks() - first_ticks
+
+	l.info("Total game time : %d min, %d sec, %d ms"\
+	%(total_time / 60000,(total_time / 1000) % 60,total_time % 1000))
+
+	l.info("Total wait time : %d min, %d sec, %d ms, ie %f percent of the time"\
+	%(total_wait_time / 60000,(total_wait_time / 1000) % 60,total_wait_time % 1000,100*float(total_wait_time)/total_time))
+						
+	
 	l.info("Gameplay  fps : " + str(float(frame)/(pygame.time.get_ticks()-first_ticks)*1000))
 	l.info("Graphical fps : " + str(float(vframe)/(pygame.time.get_ticks()-first_ticks)*1000))
 	l.info( str(skip_c) + " skips")
