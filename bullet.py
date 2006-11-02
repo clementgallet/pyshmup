@@ -92,8 +92,6 @@ class SimpleBulletML(object):
 		if self.to_remove:
 			return self
 
-		try:
-
 		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
 		       self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT):
 			self.vanish()

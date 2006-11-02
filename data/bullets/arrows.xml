@@ -1,0 +1,76 @@
+<bulletml>
+ <action label="top_left">
+  <repeat>
+  <times>360</times>
+  <action>
+   <fire>
+	 <direction type="sequence">19</direction>
+	 <speed>3</speed>
+	 <bulletRef label="arrow_left"/>
+	</fire>
+  <wait>4</wait>
+  </action>
+  </repeat>
+ </action>
+
+ <action label="top_right">
+  <repeat>
+   <times>360</times>
+  <action>
+   <fire>
+	 <direction type="sequence">19</direction>
+	 <speed>3</speed>
+	 <bulletRef label="arrow_right"/>
+	</fire>
+  <wait>4</wait>
+  </action>
+  </repeat>
+ </action>
+
+ <bullet label="arrow_left">
+  <action>
+	<fire>
+	 <direction type="relative">40</direction>
+	 <speed>0.8</speed>
+	 <bullet/>
+	</fire>
+	<wait>1</wait>
+   <repeat>
+	 <times>10</times>
+	 <action>
+	  <fire>
+	   <direction type="sequence">-4</direction>
+	   <speed type="sequence">0.1</speed>
+	   <bullet/>
+	  </fire>
+	<wait>1</wait>
+	 </action>
+	</repeat>
+	<vanish/>
+  </action>
+ </bullet>
+
+ <bullet label="arrow_right">
+  <action>
+	<fire>
+	 <direction type="relative">-40</direction>
+	 <speed>0.8</speed>
+	 <bullet/>
+	</fire>
+	<wait>1</wait>
+   <repeat>
+	 <times>10</times>
+	 <action>
+	  <fire>
+	   <direction type="sequence">4</direction>
+	   <speed type="sequence">0.1</speed>
+	   <bullet/>
+	  </fire>
+	<wait>1</wait>
+	 </action>
+	</repeat>
+	<vanish/>
+  </action>
+ </bullet>
+
+</bulletml>

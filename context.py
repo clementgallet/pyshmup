@@ -67,7 +67,7 @@ class GameContext(object):
 		# Update everything
 		self._move_bullets()
 		self._out_bounds()
-		self._check_collisons()
+		self._check_collisions()
 		self._update_objects()
 
 		#self._check_array()
@@ -222,7 +222,7 @@ class GameContext(object):
 		        self.bullet_array_ml[ARRAY_ML_DIRECTION], \
 		        math.pi/180)), \
 		    self.bullet_array_ml[ARRAY_ML_SPEED]), \
-		  self.bullet_array_ML[ARRAY_ML_X])
+		  self.bullet_array_ml[ARRAY_ML_X])
 		
 		num.subtract( \
 		  self.bullet_array_ml[ARRAY_ML_Y], \
@@ -236,12 +236,13 @@ class GameContext(object):
 
 	def _out_bounds(self):
 		num.subtract(self.bullet_array[ARRAY_OUT_TIME],num.ones((self.array_ml_size),num.Float),self.bullet_array[ARRAY_OUT_TIME])
-		for i in reversed(range(self.array_fill)):
+		for i in range(self.array_fill - 1, -1, -1):
 			if self.bullet_array[ARRAY_OUT_TIME] < 0:
 				self.delete_bullet(i)
 
 
 	def _check_collisions(self):
+		num.subtract(self.bullet_array[ARRAY_UNTIL],num.ones((self.array_ml_size),num.Float),self.bullet_array[ARRAY_UNTIL])
 		coll.coll(self.bullet_array, self.array_fill, self.player_list, len(self.player_list))
 		collml.collml(self.bullet_array_ml, self.array_ml_fill, self.player_list, len(self.player_list))
 

@@ -150,11 +150,11 @@ def handle_events(system_state):
 		system_state.quit = True
 
 	# Inputs
-	system_state.inputs[context.id] = (keys[KEY_RIGHT],\
-	                                   keys[KEY_LEFT],\
-	                                   keys[KEY_UP],\
-	                                   keys[KEY_DOWN],\
-	                                   keys[KEY_SHOT])
+	system_state.inputs[0] = (keys[KEY_RIGHT],\
+	                          keys[KEY_LEFT],\
+	                          keys[KEY_UP],\
+	                          keys[KEY_DOWN],\
+	                          keys[KEY_SHOT])
 
 class SystemState(object):
 	def __init__(self):

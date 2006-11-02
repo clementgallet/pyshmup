@@ -20,6 +20,7 @@ class Player:
 		context.update_list.append(self)
 		context.player_list.append(self)
 		self.to_remove = False
+		self.speed = PLAYER_SPEED
 
 		self.sprite = sprite.get_sprite(SHIP_BITMAP)
 
@@ -60,13 +61,13 @@ class Player:
 		self.y += dy*PLAYER_SPEED
 		self.frame += 1
 		
-		for i in reversed(range(self._context.array_fill)):
-			if (self._context.bullet_array[i,ARRAY_COLLIDE] & 1 << self.index):
+		for i in range(self._context.array_fill - 1, -1, -1):
+			if (self._context.bullet_array[i,ARRAY_COLLIDE_MASK] & 1 << self.index):
 				self._context.delete_bullet(i)
 				self.to_remove = True
 		
-		for i in reversed(range(self._context.array_ml_fill)):
-			if (self._context.bullet_array_ml[i,ARRAY_ML_COLLIDE] & 1 << self.index):
+		for i in range(self._context.array_ml_fill - 1, -1, -1):
+			if (self._context.bullet_array_ml[i,ARRAY_ML_COLLIDE_MASK] & 1 << self.index):
 				self._context.bullet_list[i].vanish()
 				self.to_remove = True
 		

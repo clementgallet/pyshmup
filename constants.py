@@ -69,6 +69,7 @@ ARRAY_ML_DIM = 7
 
 PLAYER_NUMBER = 1
 
+NEVER = 9999
 
 ####################
 # Derived constants
@@ -101,6 +102,7 @@ KEY_LEFT = pygame.K_j
 KEY_RIGHT = pygame.K_l
 KEY_UP = pygame.K_i
 KEY_DOWN = pygame.K_k
+KEY_QUIT = pygame.K_ESCAPE
 
 # Keys index
 
@@ -126,7 +128,6 @@ BACKGROUND_COLOR = (0, 0, 0, 1)
 SHOT_COLOR = [.425, .475, .475, 1]
 SHOT_WIDTH = 50
 
-NEVER = 9999
 
 #####################
 ## Derived constants

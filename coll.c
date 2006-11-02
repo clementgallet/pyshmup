@@ -38,9 +38,9 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 	double rel_s_x, rel_s_y; /* relative speeds (bullet - player) */
 	int    e_x, e_y; /* approach direction :
 	                      1  : player goes positive  ---->
-								 0  : player does not move    |
-								 -1 : player goes negative  <----
-							  (the player tries to hit the bullet) */
+	                      0  : player does not move    |
+	                      -1 : player goes negative  <----
+	                      (the player tries to hit the bullet) */
 	double t_x,t_y;  /* time to hit (on each axis) */
 	double t;        /* time to hit (total) */
 
@@ -49,36 +49,32 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 	int i,size;
 
 	PyArrayObject *array;
-	PyListObject *players;
-	PyArg_ParseTuple(args,"O!iO!i",&PyArray_Type,&array,&size,&PyList_Type,&players,&nb_players);
+	PyObject *players;
+	PyArg_ParseTuple(args,"O!iO!i",&PyArray_Type,&array,&size,&PyObject_Type,&players,&nb_players);
 
-	for (p_num=0;p_num<nb_players;p_num++)
+	for (i=0;i<size;i++)
 	{
-		p_x = PyFloat_AsDouble(PyObject_GetAttrString(PyList_GetItem(players,p_num),"x"));
-		p_y = PyFloat_AsDouble(PyObject_GetAttrString(PyList_GetItem(players,p_num),"y"));
-		p_s = PyFloat_AsDouble(PyObject_GetAttrString(PyList_GetItem(players,p_num),"speed"));
-		for (i=0;i<size;i++)
-		{
-			if (array_elem(UNTIL) > 0)
-			{
-				array_elem(UNTIL)--;
-				continue;
-			}
+		if (array_elem(UNTIL) >= 0)
+			continue;
 
-			array_elem(UNTIL) = NEVER;
+		array_elem(UNTIL) = NEVER;
 
-			b_x = array_elem(X);
-			b_y = array_elem(Y);
-			b_d = array_elem(DIRECTION);
-			b_s = array_elem(SPEED);
+		b_x = array_elem(X);
+		b_y = array_elem(Y);
+		b_d = array_elem(DIRECTION);
+		b_s = array_elem(SPEED);
 
-			/* we build t_x and t_y, lower bounds on the time
-			 * till we get a collision between the bullet and
-			 * the player (we assume the player is heading dead on)
-			 */
+		/* we build t_x and t_y, lower bounds on the time
+		 * till we get a collision between the bullet and
+		 * the player (we assume the player is heading dead on)
+		 */
 
-			/* for p_x, p_y, ..... */
 		
+		for (p_num=0;p_num<nb_players;p_num++)
+		{
+			p_x = PyFloat_AsDouble(PyObject_GetAttrString(PyList_GetItem(players,p_num),"x"));
+			p_y = PyFloat_AsDouble(PyObject_GetAttrString(PyList_GetItem(players,p_num),"y"));
+			p_s = PyFloat_AsDouble(PyObject_GetAttrString(PyList_GetItem(players,p_num),"speed"));
 			e_x = (b_x > p_x) ? 1 : (b_x < p_x) ? -1 : 0;
 			e_y = (b_y > p_y) ? 1 : (b_y < p_y) ? -1 : 0;
 
@@ -107,13 +103,13 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 
 			array_elem(UNTIL) = min(array_elem(UNTIL), t);
 
-			if (t == 0) /* collision ! */
+			if ((int)t == 0) /* collision ! */
 				array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) | (1 << p_num);
 			else
-				array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) & (-1 - 1 << p_num);
+				array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) & (-1 - (1 << p_num));
 		}
 	}
-return;
+	return Py_INCREF(Py_None), Py_None;
 }
 
 static PyMethodDef DrawMethods[] = {
@@ -123,7 +119,6 @@ static PyMethodDef DrawMethods[] = {
 
 PyMODINIT_FUNC initcoll(void)
 {
-	int i;
 	(void) Py_InitModule("coll", DrawMethods);
 	import_array();
 }

@@ -16,3 +16,11 @@ setup(name = 'coll',
 	version = '0.1',
 	description = 'This is also a demo package',
 	ext_modules = [coll])
+
+collml = Extension('collml', sources = ['collml.c'],
+	)
+
+setup(name = 'collml',
+	version = '0.1',
+	description = 'This is also a demo package',
+	ext_modules = [collml])

@@ -33,8 +33,8 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 	int i,size;
 
 	PyArrayObject *array;
-	PyListObject *players;
-	PyArg_ParseTuple(args,"O!iO!i",&PyArray_Type,&array,&size,&PyList_Type,&players,&nb_players);
+	PyObject *players;
+	PyArg_ParseTuple(args,"O!iO!i",&PyArray_Type,&array,&size,&PyObject_Type,&players,&nb_players);
 
 	for (p_num=0;p_num<nb_players;p_num++)
 	{
@@ -45,13 +45,13 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 			b_x = array_elem(X);
 			b_y = array_elem(Y);
 
-			if (max(dabs(b_x - d_x),dabs(b_y - d_y)) < RADIUS) /* collision ! */
+			if (max(dabs(b_x - p_x),dabs(b_y - p_y)) < RADIUS) /* collision ! */
 				array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) | (1 << p_num);
 			else
-				array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) & (-1 - 1 << p_num);
+				array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) & (-1 - (1 << p_num));
 		}
 	}
-return;
+return Py_INCREF(Py_None), Py_None;
 }
 
 static PyMethodDef DrawMethods[] = {
@@ -59,9 +59,8 @@ static PyMethodDef DrawMethods[] = {
 	{NULL, NULL, 0, NULL}
 };
 
-PyMODINIT_FUNC initcoll(void)
+PyMODINIT_FUNC initcollml(void)
 {
-	int i;
 	(void) Py_InitModule("collml", DrawMethods);
 	import_array();
 }

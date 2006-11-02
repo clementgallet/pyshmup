@@ -1,0 +1,69 @@
+<bulletml>
+ <action label="top">
+  <repeat>
+   <times>20</times>
+	<action>
+	 <fire>
+	  <bulletRef label="line">
+	  <param>1</param>
+	  </bulletRef>
+	  <direction type="sequence">200</direction>
+	  <speed>5</speed>
+	 </fire>
+	 <fire>
+	  <bulletRef label="line">
+	  <param>1</param>
+	  </bulletRef>
+	  <direction type="sequence">180</direction>
+	  <speed>5</speed>
+	 </fire>
+	 <wait>30</wait>
+	</action>
+  </repeat>
+
+  <repeat>
+   <times>200</times>
+	<action>
+	 <fire>
+	  <bulletRef label="line">
+	  <param>0.6</param>
+	  </bulletRef>
+	  <direction type="sequence">190</direction>
+	  <speed>5</speed>
+	 </fire>
+	 <fire>
+	  <bulletRef label="line">
+	  <param>0.6</param>
+	  </bulletRef>
+	  <direction type="sequence">180</direction>
+	  <speed>5</speed>
+	 </fire>
+	 <wait>10</wait>
+	</action>
+  </repeat>
+ </action>
+
+ <bullet label="line">
+  <action>
+   <fire>
+	 <bullet/>
+	 <direction type="aim">0</direction>
+	 <speed>$1</speed>
+	</fire>
+   <wait>1</wait>
+	<repeat>
+	 <times>10</times>
+	 <action>
+     <fire>
+      <bullet/>
+	   <direction type="aim">0</direction>
+	   <speed type="sequence">0.2</speed>
+	  </fire>
+	  <wait>1</wait>
+	 </action>
+	</repeat>
+  <vanish/>
+  </action>
+ </bullet>
+	
+</bulletml>
