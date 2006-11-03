@@ -10,13 +10,9 @@ class SimpleBulletML(object):
 	def __init__(self, context):
 	
 		self._context = context
-		self.x = 0
-		self.y = 0
-		self.direction = 0
-		self.speed = 0
 		
 		context.update_list.append(self)
-		self.index = len(context.bullet_list)
+		self.index = len(self._context.bullet_list)
 		context.bullet_list.append(self)
 		
 		self.controller = BulletMLController()
@@ -54,8 +50,7 @@ class SimpleBulletML(object):
 
 	def vanish(self):
 		self.to_remove = True
-		self._context.bullet_list.remove(self)
-		delete_bullet_ml(self.index)
+		self._context.delete_bullet_ml(self.index)
 
 	def fire_complex(self, controller, direction=None, speed=None):
 		new_bullet = SimpleBulletML(self._context)
@@ -64,16 +59,12 @@ class SimpleBulletML(object):
 		new_bullet.aimed_player = self.aimed_player
 		new_bullet.sprite = self.sprite
 
-		if direction is not None:
-			new_bullet.direction = direction
-		else:
-			new_bullet.direction = self.direction
-		if speed is not None:
-			new_bullet.speed = speed
-		else:
-			new_bullet.speed = self.speed
+		if direction is None:
+			direction = self.direction
+		if speed is None:
+			speed = self.speed
 			
-		self._context.create_bullet_ml(self.x, self.y, self.z+0.001, new_bullet.direction, new_bullet.speed, self.sprite.list)
+		self._context.create_bullet_ml(self.x, self.y, self.z+0.001, direction, speed, self.sprite.list)
 
 	def fire(self, direction=None, speed=None):
 		if direction is None:

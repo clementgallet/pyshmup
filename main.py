@@ -112,7 +112,7 @@ def init_sdl():
 	
 
 def get_turn_actions():
-	global next_ticks
+	global next_ticks, total_wait_time
 	global skip_c, fskip
 	if next_ticks == 0:
 		next_ticks = pygame.time.get_ticks() + 1000/FPS
@@ -201,8 +201,8 @@ def main():
 		game_context.update(system_state)
 
 		# Updates max objects
-		if game_context.bullet_list_length + game_context.array_fill > max_ob:
-			max_ob = game_context.bullet_list_length + game_context.array_fill
+		if len(game_context.bullet_list) + game_context.array_fill > max_ob:
+			max_ob = len(game_context.bullet_list) + game_context.array_fill
 		
 		# Wait until end of frame or skip frame
 		turn_actions = get_turn_actions()

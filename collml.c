@@ -34,7 +34,7 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 
 	PyArrayObject *array;
 	PyObject *players;
-	PyArg_ParseTuple(args,"O!iO!i",&PyArray_Type,&array,&size,&PyObject_Type,&players,&nb_players);
+	PyArg_ParseTuple(args,"O!iOi",&PyArray_Type,&array,&size,&players,&nb_players);
 
 	for (p_num=0;p_num<nb_players;p_num++)
 	{

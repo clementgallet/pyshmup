@@ -84,6 +84,7 @@ class GameContext(object):
 
 		for object in self.player_list + self.foe_list + self.shot_list:
 			object.draw()
+		#print ("nbr of normal/ml bullets : " + str(self.array_fill) + "/" + str(self.array_ml_fill))
 		draw.draw(self.bullet_array, self.array_fill,self.bullet_array_ml, self.array_ml_fill)
 #		gl.glAccum(gl.GL_MULT, 0.9)
 #		gl.glAccum(gl.GL_ACCUM, 1.0)
@@ -99,16 +100,6 @@ class GameContext(object):
 		"""
 		Book a slot in the big bullet array, and return its index.
 		"""
-		index = self.array_fill
-		self.array_fill += 1
-
-		# Grow array
-		if self.array_fill == self.array_size:
-			new_array = num.zeros((ARRAY_DIM,2*self.array_size),num.Float)
-			new_array[:,:self.array_size] = self.bullet_array
-			self.bullet_array = new_array
-			self.array_size *= 2
-		
 		# Calculate time before the bullet is out of screen
 		# (the +10 / -10 on the first line
 		# is to avoid wrapping of the modulo around 0)
@@ -131,7 +122,7 @@ class GameContext(object):
 			             (-math.cos(direction*math.pi/180)*speed)
 	
 		out_time = min(time_x,time_y)
-	
+		#print ("out_time : " + str(out_time))	
 #		bullet_array[ARRAY_X][index] = x
 #		bullet_array[ARRAY_Y][index] = y
 #		bullet_array[ARRAY_Z][index] = z
@@ -141,15 +132,32 @@ class GameContext(object):
 #		bullet_array[ARRAY_UNTIL][index] = 0
 #		bullet_array[ARRAY_OUT_TIME][index] = out_time
 #		bullet_array[ARRAY_COLLIDE_MASK][index] = 0
-		self.bullet_array[:,index] = (x,y,z,direction,speed,display_list,0,out_time,0)
+		#print("x : " + str(x) +  ", y : " + str(y))
+		self.bullet_array[:,self.array_fill] = (x,y,z,direction,speed,display_list,0,out_time,0)
 	
-		return index
+		self.array_fill += 1
 
+		# Grow array
+		if self.array_fill == self.array_size:
+			new_array = num.zeros((ARRAY_DIM,2*self.array_size),num.Float)
+			new_array[:,:self.array_size] = self.bullet_array
+			self.bullet_array = new_array
+			self.array_size *= 2
+		
 	def create_bullet_ml(self, x, y, z, direction, speed, display_list):
 		"""
 		Book a slot in the big bullet array, and return its index.
 		"""
+#		bullet_array_ml[ARRAY_ML_X][index] = x
+#		bullet_array_ml[ARRAY_ML_Y][index] = y
+#		bullet_array_ml[ARRAY_ML_Z][index] = z
+#		bullet_array_ml[ARRAY_ML_DIRECTION][index] = direction
+#		bullet_array_ml[ARRAY_ML_SPEED][index] = speed
+#		bullet_array_ml[ARRAY_ML_LIST][index] = display_list
+#		bullet_array_ml[ARRAY_ML_COLLIDE_MASK][index] = 0
+		self.bullet_array_ml[:,self.array_ml_fill] = (x,y,z,direction,speed,display_list,0)
 		self.array_ml_fill += 1
+#		print("add bullet : #" + str(self.array_ml_fill))
 
 		# Grow array
 		if self.array_ml_fill == self.array_ml_size:
@@ -158,14 +166,6 @@ class GameContext(object):
 			self.bullet_array_ml = new_array
 			self.array_ml_size *= 2
 		
-#		bullet_array_ml[ARRAY_ML_X][index] = x
-#		bullet_array_ml[ARRAY_ML_Y][index] = y
-#		bullet_array_ml[ARRAY_ML_Z][index] = z
-#		bullet_array_ml[ARRAY_ML_DIRECTION][index] = direction
-#		bullet_array_ml[ARRAY_ML_SPEED][index] = speed
-#		bullet_array_ml[ARRAY_ML_LIST][index] = display_list
-#		bullet_array_ml[ARRAY_ML_COLLIDE_MASK][index] = 0
-		self.bullet_array[:,index] = (x,y,z,direction,speed,display_list)
 	
 	def delete_bullet(self, index):
 		"""
@@ -181,12 +181,13 @@ class GameContext(object):
 		"""
 		Free a slot in the big bullet array.
 		"""
-		
 		# Decrease size and fill emptied slot
 		self.array_ml_fill -= 1
+#		print("delete bullet "+str(index)+" : #" + str(self.array_ml_fill))
 		bullet = self.bullet_list.pop()
 		if self.array_ml_fill != index:
-			self.bullet_array_ml[:, index] = self.bullet_array_ml[:, self.array_fill]
+			self.bullet_array_ml[:, index] = self.bullet_array_ml[:, self.array_ml_fill]
+			bullet.index = index
 			self.bullet_list[index] = bullet
 		
 
@@ -235,14 +236,16 @@ class GameContext(object):
 		  self.bullet_array_ml[ARRAY_ML_Y]) 
 
 	def _out_bounds(self):
-		num.subtract(self.bullet_array[ARRAY_OUT_TIME],num.ones((self.array_ml_size),num.Float),self.bullet_array[ARRAY_OUT_TIME])
+		num.subtract(self.bullet_array[ARRAY_OUT_TIME],num.ones((self.array_size),num.Float),self.bullet_array[ARRAY_OUT_TIME])
 		for i in range(self.array_fill - 1, -1, -1):
-			if self.bullet_array[ARRAY_OUT_TIME] < 0:
+			#print self.bullet_array[ARRAY_OUT_TIME]
+			if self.bullet_array[ARRAY_OUT_TIME,i] < 0:
 				self.delete_bullet(i)
+				#print("delete bullet : out bounds")
 
 
 	def _check_collisions(self):
-		num.subtract(self.bullet_array[ARRAY_UNTIL],num.ones((self.array_ml_size),num.Float),self.bullet_array[ARRAY_UNTIL])
+		num.subtract(self.bullet_array[ARRAY_UNTIL],num.ones((self.array_size),num.Float),self.bullet_array[ARRAY_UNTIL])
 		coll.coll(self.bullet_array, self.array_fill, self.player_list, len(self.player_list))
 		collml.collml(self.bullet_array_ml, self.array_ml_fill, self.player_list, len(self.player_list))
 

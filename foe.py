@@ -63,15 +63,11 @@ class Foe(object):
 		new_bullet.aimed_player = self.aimed_player
 		new_bullet.sprite = self.bullet_sprite
 		
-		if direction is not None:
-			new_bullet.direction = direction
-		else:
-			new_bullet.direction = self.direction
-		if speed is not None:
-			new_bullet.speed = speed
-		else:
-			new_bullet.speed = self.speed
-		self._context.create_bullet_ml(self.x, self.y, self.z+0.001, new_bullet.direction, new_bullet.speed, self.sprite.list)
+		if direction is None:
+			direction = self.direction
+		if speed is None:
+			speed = self.speed
+		self._context.create_bullet_ml(self.x, self.y, self.z+0.001, direction, speed, self.bullet_sprite.list)
 
 
 	def fire(self, direction=None, speed=None):

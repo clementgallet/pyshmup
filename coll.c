@@ -46,13 +46,14 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 
 	int p_num,nb_players;
 
-	int i,size;
+	int i;
+	int size;
 
 	PyArrayObject *array;
 	PyObject *players;
-	PyArg_ParseTuple(args,"O!iO!i",&PyArray_Type,&array,&size,&PyObject_Type,&players,&nb_players);
+	PyArg_ParseTuple(args,"O!iOi",&PyArray_Type,&array,&size,&players,&nb_players);
 
-	for (i=0;i<size;i++)
+	for (i=0;i < size;i++)
 	{
 		if (array_elem(UNTIL) >= 0)
 			continue;
@@ -64,6 +65,7 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 		b_d = array_elem(DIRECTION);
 		b_s = array_elem(SPEED);
 
+		//printf("b_x = %f / b_y = %f\n",b_x,b_y); 
 		/* we build t_x and t_y, lower bounds on the time
 		 * till we get a collision between the bullet and
 		 * the player (we assume the player is heading dead on)
@@ -79,34 +81,32 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 			e_y = (b_y > p_y) ? 1 : (b_y < p_y) ? -1 : 0;
 
 			rel_s_x = sin(b_d)*b_s - e_x*p_s;
-			rel_s_y = -1*cos(b_d)*b_s - e_y*p_s;
+			rel_s_y = (-1)*cos(b_d)*b_s - e_y*p_s;
 
 			if (dabs(b_x - p_x) < RADIUS)
 				t_x = 0;
 			else
-				t_x = ((b_x - p_x) - e_x*RADIUS)/rel_s_x;
+				t_x = (e_x*RADIUS - b_x + p_x)/rel_s_x;
 
 			if (dabs(b_y - p_y) < RADIUS)
 				t_y = 0;
 			else
-				t_y = ((b_y - p_y) - e_y*RADIUS)/rel_s_y;
+				t_y = (e_y*RADIUS - b_y + p_y)/rel_s_y;
 
-			if (t_x < 0) /* divergent trajectories */
+			if ((t_x >= 0) && (t_y >= 0)) /* collision is possible */
 			{
-				if (t_y < 0) /* doubly so */
-					t = NEVER;
-				else
-					t = t_y;
-			}
-			else
 				t = max(t_x, t_y);
+				array_elem(UNTIL) = min(array_elem(UNTIL), t); /* keeps the minimum time among all the players
+				                                                * for a possible collision */
+				if (t == 0) /* collision ! */
+				{
+					array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) | (1 << p_num);
+					continue;
+				}
+			}
+			/* non collision */
+			array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) & (-1 - (1 << p_num));
 
-			array_elem(UNTIL) = min(array_elem(UNTIL), t);
-
-			if ((int)t == 0) /* collision ! */
-				array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) | (1 << p_num);
-			else
-				array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) & (-1 - (1 << p_num));
 		}
 	}
 	return Py_INCREF(Py_None), Py_None;

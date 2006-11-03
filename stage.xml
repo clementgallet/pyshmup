@@ -22,7 +22,7 @@
 <frame>0</frame>
 <bullet>shot3.png</bullet>
 <sprite>foe.png</sprite>
-</foe>
+</foe>-->
 <foe>
 <behav>lines.xml</behav>
 <x>0</x>
@@ -30,6 +30,6 @@
 <frame>0</frame>
 <bullet>shot3.png</bullet>
 <sprite>foe.png</sprite>
-</foe>-->
+</foe>
 </stage>
 
