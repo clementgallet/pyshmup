@@ -15,7 +15,7 @@ constants.h: constants.py
 	@echo -e '\n\n#endif\n' >> constants.h
 
 tags:	*.py
-	ctags *.py
+	-ctags *.py
 
 clean:
 	$(RM) *.pyc *.pyo constants.h *.so
