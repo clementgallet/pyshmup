@@ -10,7 +10,6 @@ import stage
 
 import draw
 import coll
-import collml
 
 from pprint import pprint
 
@@ -247,7 +246,7 @@ class GameContext(object):
 	def _check_collisions(self):
 		num.subtract(self.bullet_array[ARRAY_UNTIL],num.ones((self.array_size),num.Float),self.bullet_array[ARRAY_UNTIL])
 		coll.coll(self.bullet_array, self.array_fill, self.player_list, len(self.player_list))
-		collml.collml(self.bullet_array_ml, self.array_ml_fill, self.player_list, len(self.player_list))
+		coll.collml(self.bullet_array_ml, self.array_ml_fill, self.player_list, len(self.player_list))
 
 	def _update_objects(self):
 		self.update_list = [obj for obj in self.update_list if obj.update().to_remove == False]

@@ -51,6 +51,7 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 
 	PyArrayObject *array;
 	PyObject *players;
+	PyObject *attr;
 	PyArg_ParseTuple(args,"O!iOi",&PyArray_Type,&array,&size,&players,&nb_players);
 
 	for (i=0;i < size;i++)
@@ -74,9 +75,15 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 		
 		for (p_num=0;p_num<nb_players;p_num++)
 		{
-			p_x = PyFloat_AsDouble(PyObject_GetAttrString(PyList_GetItem(players,p_num),"x"));
-			p_y = PyFloat_AsDouble(PyObject_GetAttrString(PyList_GetItem(players,p_num),"y"));
-			p_s = PyFloat_AsDouble(PyObject_GetAttrString(PyList_GetItem(players,p_num),"speed"));
+			attr = PyObject_GetAttrString(PyList_GetItem(players,p_num),"x");
+			p_x = PyFloat_AsDouble(attr);
+			Py_DECREF(attr);
+			attr = PyObject_GetAttrString(PyList_GetItem(players,p_num),"y");
+			p_y = PyFloat_AsDouble(attr);
+			Py_DECREF(attr);
+			attr = PyObject_GetAttrString(PyList_GetItem(players,p_num),"speed");
+			p_s = PyFloat_AsDouble(attr);
+			Py_DECREF(attr);
 			e_x = (b_x > p_x) ? 1 : (b_x < p_x) ? -1 : 0;
 			e_y = (b_y > p_y) ? 1 : (b_y < p_y) ? -1 : 0;
 
@@ -112,8 +119,44 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 	return Py_INCREF(Py_None), Py_None;
 }
 
+static PyObject *update_collisions_ml(PyObject *self, PyObject *args)
+{
+	double p_x, p_y; /* player coordinates */
+	double b_x, b_y; /* bullet coordinates */
+	int p_num,nb_players;
+
+	int i,size;
+
+	PyArrayObject *array;
+	PyObject *players;
+	PyObject *attr;
+	PyArg_ParseTuple(args,"O!iOi",&PyArray_Type,&array,&size,&players,&nb_players);
+
+	for (p_num=0;p_num<nb_players;p_num++)
+	{
+		attr = PyObject_GetAttrString(PyList_GetItem(players,p_num),"x");
+		p_x = PyFloat_AsDouble(attr);
+		Py_DECREF(attr);
+		attr = PyObject_GetAttrString(PyList_GetItem(players,p_num),"y");
+		p_y = PyFloat_AsDouble(attr);
+		Py_DECREF(attr);
+		for (i=0;i<size;i++)
+		{
+			b_x = array_elem(ML_X);
+			b_y = array_elem(ML_Y);
+
+			if (max(dabs(b_x - p_x),dabs(b_y - p_y)) < RADIUS) /* collision ! */
+				array_elem(ML_COLLIDE_MASK) = ((int) array_elem(ML_COLLIDE_MASK)) | (1 << p_num);
+			else
+				array_elem(ML_COLLIDE_MASK) = ((int) array_elem(ML_COLLIDE_MASK)) & (-1 - (1 << p_num));
+		}
+	}
+	return Py_INCREF(Py_None), Py_None;
+}
+
 static PyMethodDef DrawMethods[] = {
 	{"coll", update_collisions, METH_VARARGS, "Search for collisions"},
+	{"collml", update_collisions_ml, METH_VARARGS, "Search for collisions in ml bullets"},
 	{NULL, NULL, 0, NULL}
 };
 
