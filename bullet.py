@@ -75,6 +75,9 @@ class SimpleBulletML(object):
 		self._context.create_bullet(self.x, self.y, self.z+0.001, direction, speed, self.sprite.list)
 
 	def update(self):
+		if self.to_remove:
+			return self
+		
 		if self.wait > 0:
 			self.wait -= 1
 		else:

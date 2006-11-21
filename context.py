@@ -7,6 +7,7 @@ import pygame
 
 import player
 import stage
+import sprite
 
 import draw
 import coll
@@ -39,18 +40,22 @@ class GameContext(object):
 		self.array_ml_size = 8
 		self.bullet_array_ml = num.zeros((ARRAY_ML_DIM, self.array_ml_size), num.Float)
 		self.array_ml_fill = 0
-		
+	
+		self.collision = 0
+		self.collisionML = 0
 		player.Player(self)
+
+		#self.tr = sprite.get_sprite(BULLET_BITMAP)
 
 	####################################
 	#  Interface for higher-level usage
 
-	def load_stage(self, stage_name):
+	def load_stage(self):
 		"""
 		Create an initial game state from a stage file.
 		"""
 		self.__init__() # reinit
-		self.update_list.append(stage.StageLoader(self, stage_name))
+		self.update_list.append(stage.Stage1(self))
 	
 	def update(self, system_state):
 		"""
@@ -180,10 +185,14 @@ class GameContext(object):
 		"""
 		Free a slot in the big bullet array.
 		"""
+		if index >= self.array_ml_fill:
+			print "array : " + str(self.array_ml_fill) + " - index : " + str(index)
 		# Decrease size and fill emptied slot
 		self.array_ml_fill -= 1
 #		print("delete bullet "+str(index)+" : #" + str(self.array_ml_fill))
 		bullet = self.bullet_list.pop()
+		if index > self.array_ml_fill:
+			print "index sup as array_fill"
 		if self.array_ml_fill != index:
 			self.bullet_array_ml[:, index] = self.bullet_array_ml[:, self.array_ml_fill]
 			bullet.index = index
@@ -245,8 +254,8 @@ class GameContext(object):
 
 	def _check_collisions(self):
 		num.subtract(self.bullet_array[ARRAY_UNTIL],num.ones((self.array_size),num.Float),self.bullet_array[ARRAY_UNTIL])
-		coll.coll(self.bullet_array, self.array_fill, self.player_list, len(self.player_list))
-		coll.collml(self.bullet_array_ml, self.array_ml_fill, self.player_list, len(self.player_list))
+		self.collision = coll.coll(self.bullet_array, self.array_fill, self.player_list, len(self.player_list))
+		self.collisionML = coll.collml(self.bullet_array_ml, self.array_ml_fill, self.player_list, len(self.player_list))
 
 	def _update_objects(self):
 		self.update_list = [obj for obj in self.update_list if obj.update().to_remove == False]

@@ -19,3 +19,4 @@ tags:	*.py
 
 clean:
 	$(RM) *.pyc *.pyo constants.h *.so
+	$(RM) -r build

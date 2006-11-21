@@ -1,5 +1,4 @@
 import logging
-import copy
 import xml.dom.minidom
 
 from constants import *
@@ -19,12 +18,9 @@ class StageLoader(object):
 
 	to_remove = False
 	
-	def __init__(self, context, stage_file=None):
+	def __init__(self, context):
 		self._context = context
 		self.launch_list = []
-		if stage_file is not None:
-			self.load(stage_file)
-#		self.frame = 0
 
 	def update(self):
 		"""
@@ -39,33 +35,20 @@ class StageLoader(object):
 			obj.spawn(self._context)
 		return self
 
-	def load(self, stage_file):
-		"""
-		Load the stage contents from a stage file.
-		"""
-		print [stage_file]
-		doc =  xml.dom.minidom.parse(stage_file)
-		root = doc.documentElement
+	def create(self, ml, x, y, frame, bullet, sprite_name):
+		foe = BulletMLFoe(BEHAV_PATH + ml)
+		foe.x = x
+		foe.y = y
+		foe.sprite = sprite.get_sprite(BITMAP_PATH + sprite_name)
+		foe.bullet_sprite = sprite.get_sprite(BITMAP_PATH + bullet)
+		foe.frame = frame
+		self.launch_list.append(foe)
 
-		launch_list = []
 
-		for foe_node in root.getElementsByTagName("foe"):
-			behav_name = foe_node.getElementsByTagName('behav')[0].childNodes[0].nodeValue
-			bullet_name = foe_node.getElementsByTagName('bullet')[0].childNodes[0].nodeValue
-			sprite_name = foe_node.getElementsByTagName('sprite')[0].childNodes[0].nodeValue
-			x = eval(foe_node.getElementsByTagName('x')[0].childNodes[0].nodeValue)
-			y = eval(foe_node.getElementsByTagName('y')[0].childNodes[0].nodeValue)
-			frame = eval(foe_node.getElementsByTagName('frame')[0].childNodes[0].nodeValue)
-			
-			foe = BulletMLFoe(BEHAV_PATH + behav_name)
-			foe.x = x
-			foe.y = y
-			foe.sprite = sprite.get_sprite(BITMAP_PATH + sprite_name)
-			foe.bullet_sprite = sprite.get_sprite(BITMAP_PATH + bullet_name)
-			foe.frame = frame
-			launch_list.append(foe)
-
-			
-		self.launch_list = launch_list
-		self._stage_file = stage_file
-
+class Stage1(StageLoader):
+	
+	def __init__(self, context):
+		super(Stage1, self).__init__(context)
+		self.create('th.xml', -50, 100, 0, 'shot.png', 'foe.png')
+		self.create('th.xml', 50, 100, 50, 'shot.png', 'foe.png')
+		self.create('th.xml', 0, 100, 100, 'shot.png', 'foe.png')

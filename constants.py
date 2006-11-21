@@ -20,7 +20,7 @@ RADIUS = 3.0
 # Foes' "hit-disc" radius, in game units
 FOE_RADIUS = 10.0
 # Player speed, in game units per frame
-PLAYER_SPEED = 2.0
+PLAYER_SPEED = 3.0
 
 # Initial screen dimensions, in pixels
 WIDTH = 640
@@ -82,7 +82,7 @@ UNIT_WIDTH = ((UNIT_HEIGHT * WIDTH) / HEIGHT)
 
 
 #FIXME: Undocumented yet
-FOE_LIFE = 30
+FOE_LIFE = 20
 NB_LINES = 5 # number of lines for the shot
 
 

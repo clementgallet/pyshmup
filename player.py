@@ -60,16 +60,18 @@ class Player:
 		self.x += dx*PLAYER_SPEED
 		self.y += dy*PLAYER_SPEED
 		self.frame += 1
+	
+		if self._context.collision:
+			for i in range(self._context.array_fill - 1, -1, -1):
+				if (int(self._context.bullet_array[ARRAY_COLLIDE_MASK,i]) & (1 << self.id)):
+					self._context.delete_bullet(i)
+					self.vanish()
 		
-		for i in range(self._context.array_fill - 1, -1, -1):
-			if (int(self._context.bullet_array[ARRAY_COLLIDE_MASK,i]) & (1 << self.id)):
-				self._context.delete_bullet(i)
-				self.vanish()
-		
-		for i in range(self._context.array_ml_fill - 1, -1, -1):
-			if (int(self._context.bullet_array_ml[ARRAY_ML_COLLIDE_MASK,i]) & (1 << self.id)):
-				self._context.bullet_list[i].vanish()
-				self.vanish()
+		if self._context.collisionML:
+			for i in range(self._context.array_ml_fill - 1, -1, -1):
+				if (int(self._context.bullet_array_ml[ARRAY_ML_COLLIDE_MASK,i]) & (1 << self.id)):
+					self._context.bullet_list[i].vanish()
+					self.vanish()
 		
 		
 		if keys[INDEX_SHOT]:

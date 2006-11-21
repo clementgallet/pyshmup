@@ -184,7 +184,7 @@ def main():
 	frame_loc = 0
 
 	game_context = context.GameContext()
-	game_context.load_stage(STAGE_FILE)
+	game_context.load_stage()
 	system_state = SystemState()
 	while pygame.time.get_ticks() < 50000 and not system_state.quit:
 

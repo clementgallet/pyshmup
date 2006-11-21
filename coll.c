@@ -22,6 +22,9 @@ inline double min(double x,double y)
 	return ((x<y) ? x : y);
 }
 
+double SINUS_LIST[3600];
+double MINUS_COSINUS_LIST[3600];
+
 #define array_elem(type) (*(double *)(array->data + ARRAY_##type*array->strides[0] + i*array->strides[1]))
 
 /**  Calculate a lower bound on the time before collision 
@@ -49,6 +52,8 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 	int i;
 	int size;
 
+	int coll = 0;
+
 	PyArrayObject *array;
 	PyObject *players;
 	PyObject *attr;
@@ -56,7 +61,7 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 
 	for (i=0;i < size;i++)
 	{
-		if (array_elem(UNTIL) >= 0)
+		if (array_elem(UNTIL) > 0)
 			continue;
 
 		array_elem(UNTIL) = NEVER;
@@ -87,8 +92,8 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 			e_x = (b_x > p_x) ? 1 : (b_x < p_x) ? -1 : 0;
 			e_y = (b_y > p_y) ? 1 : (b_y < p_y) ? -1 : 0;
 
-			rel_s_x = sin(b_d)*b_s - e_x*p_s;
-			rel_s_y = (-1)*cos(b_d)*b_s - e_y*p_s;
+			rel_s_x = SINUS_LIST[(int)(10*b_d)]*b_s - e_x*p_s;
+			rel_s_y = MINUS_COSINUS_LIST[(int)(10*b_d)]*b_s - e_y*p_s;
 
 			if (dabs(b_x - p_x) < RADIUS)
 				t_x = 0;
@@ -100,23 +105,26 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 			else
 				t_y = (e_y*RADIUS - b_y + p_y)/rel_s_y;
 
-			if ((t_x >= 0) && (t_y >= 0)) /* collision is possible */
-			{
-				t = max(t_x, t_y);
-				array_elem(UNTIL) = min(array_elem(UNTIL), t); /* keeps the minimum time among all the players
+			if (t_x < 0 || dabs(p_x + e_x * t_x * PLAYER_SPEED) > UNIT_WIDTH)
+				t_x = NEVER;
+
+			if (t_y < 0 || dabs(p_y + e_y * t_y * PLAYER_SPEED) > UNIT_HEIGHT)
+				t_y = NEVER;
+
+			t = max(t_x, t_y);
+			array_elem(UNTIL) = min(array_elem(UNTIL), t); /* keeps the minimum time among all the players
 				                                                * for a possible collision */
-				if (t == 0) /* collision ! */
-				{
-					array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) | (1 << p_num);
-					continue;
-				}
+			if (t < 1) /* collision ! */
+			{
+				array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) | (1 << p_num);
+				coll = 1;
 			}
-			/* non collision */
-			array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) & (-1 - (1 << p_num));
+			else /* non collision */
+				array_elem(COLLIDE_MASK) = ((int) array_elem(COLLIDE_MASK)) & (-1 - (1 << p_num));
 
 		}
 	}
-	return Py_INCREF(Py_None), Py_None;
+	return Py_BuildValue("i", coll);
 }
 
 static PyObject *update_collisions_ml(PyObject *self, PyObject *args)
@@ -126,6 +134,7 @@ static PyObject *update_collisions_ml(PyObject *self, PyObject *args)
 	int p_num,nb_players;
 
 	int i,size;
+	int coll = 0;
 
 	PyArrayObject *array;
 	PyObject *players;
@@ -146,12 +155,15 @@ static PyObject *update_collisions_ml(PyObject *self, PyObject *args)
 			b_y = array_elem(ML_Y);
 
 			if (max(dabs(b_x - p_x),dabs(b_y - p_y)) < RADIUS) /* collision ! */
+			{
 				array_elem(ML_COLLIDE_MASK) = ((int) array_elem(ML_COLLIDE_MASK)) | (1 << p_num);
+				coll = 1;
+			}
 			else
 				array_elem(ML_COLLIDE_MASK) = ((int) array_elem(ML_COLLIDE_MASK)) & (-1 - (1 << p_num));
 		}
 	}
-	return Py_INCREF(Py_None), Py_None;
+	return Py_BuildValue("i", coll);
 }
 
 static PyMethodDef DrawMethods[] = {
@@ -162,6 +174,12 @@ static PyMethodDef DrawMethods[] = {
 
 PyMODINIT_FUNC initcoll(void)
 {
+	int i;
 	(void) Py_InitModule("coll", DrawMethods);
 	import_array();
+   for (i=0;i<3600;i++)
+   {
+      SINUS_LIST[i] = sin(((double)i*M_PI)/(double)1800);
+      MINUS_COSINUS_LIST[i] = (-1)*cos(((double)i*M_PI)/(double)1800);
+   }
 }
