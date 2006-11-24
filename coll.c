@@ -22,6 +22,14 @@ inline double min(double x,double y)
 	return ((x<y) ? x : y);
 }
 
+inline int truemod(int x, int n)
+{
+	int y = x%n;
+	if (y<0)
+		return y + n;
+	return y;
+}
+
 double SINUS_LIST[3600];
 double MINUS_COSINUS_LIST[3600];
 
@@ -71,7 +79,7 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 		b_d = array_elem(DIRECTION);
 		b_s = array_elem(SPEED);
 
-		//printf("b_x = %f / b_y = %f\n",b_x,b_y); 
+		//printf("b_x : %f - b_y : %f - b_d : %f - ",b_x,b_y,b_d); 
 		/* we build t_x and t_y, lower bounds on the time
 		 * till we get a collision between the bullet and
 		 * the player (we assume the player is heading dead on)
@@ -89,27 +97,37 @@ static PyObject *update_collisions(PyObject *self, PyObject *args)
 			attr = PyObject_GetAttrString(PyList_GetItem(players,p_num),"speed");
 			p_s = PyFloat_AsDouble(attr);
 			Py_DECREF(attr);
-			e_x = (b_x > p_x) ? 1 : (b_x < p_x) ? -1 : 0;
-			e_y = (b_y > p_y) ? 1 : (b_y < p_y) ? -1 : 0;
+			e_x = (b_x > p_x) + (b_x >= p_x) - 1;
+			e_y = (b_y > p_y) + (b_y >= p_y) - 1;
 
-			rel_s_x = SINUS_LIST[(int)(10*b_d)]*b_s - e_x*p_s;
-			rel_s_y = MINUS_COSINUS_LIST[(int)(10*b_d)]*b_s - e_y*p_s;
+			//printf("sin : %d\n",truemod((int)(10*b_d),3600));
+			rel_s_x = SINUS_LIST[truemod((int)(10*b_d),3600)]*b_s - e_x*p_s;
+			rel_s_y = MINUS_COSINUS_LIST[truemod((int)(10*b_d),3600)]*b_s - e_y*p_s;
+			//printf("rel_x : %f - rel_y : %f\n", rel_s_x, rel_s_y);
 
 			if (dabs(b_x - p_x) < RADIUS)
 				t_x = 0;
+			else if (dabs(rel_s_x) < 0.001)
+				t_x = NEVER;
 			else
 				t_x = (e_x*RADIUS - b_x + p_x)/rel_s_x;
 
 			if (dabs(b_y - p_y) < RADIUS)
 				t_y = 0;
+			else if (dabs(rel_s_y) < 0.001)
+				t_y = NEVER;
 			else
 				t_y = (e_y*RADIUS - b_y + p_y)/rel_s_y;
 
-			if (t_x < 0 || dabs(p_x + e_x * t_x * PLAYER_SPEED) > UNIT_WIDTH)
+			//if (t_x < 0 || dabs(p_x + e_x * t_x * PLAYER_SPEED) > UNIT_WIDTH)
+			if (t_x < 0)
 				t_x = NEVER;
 
-			if (t_y < 0 || dabs(p_y + e_y * t_y * PLAYER_SPEED) > UNIT_HEIGHT)
+			//if (t_y < 0 || dabs(p_y + e_y * t_y * PLAYER_SPEED) > UNIT_HEIGHT)
+			if (t_y < 0)
 				t_y = NEVER;
+
+			//printf("t_x : %f - t_y : %f\n",t_x, t_y);
 
 			t = max(t_x, t_y);
 			array_elem(UNTIL) = min(array_elem(UNTIL), t); /* keeps the minimum time among all the players
