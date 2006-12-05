@@ -244,16 +244,17 @@ class GameContext(object):
 		  self.bullet_array_ml[ARRAY_ML_Y]) 
 
 	def _out_bounds(self):
-		num.subtract(self.bullet_array[ARRAY_OUT_TIME],num.ones((self.array_size),num.Float),self.bullet_array[ARRAY_OUT_TIME])
-		for i in range(self.array_fill - 1, -1, -1):
-			#print self.bullet_array[ARRAY_OUT_TIME]
-			if self.bullet_array[ARRAY_OUT_TIME,i] < 0:
-				self.delete_bullet(i)
-				#print("delete bullet : out bounds")
+		self.bullet_array[ARRAY_OUT_TIME] -= 1.
+		if not (self.frame % 10):
+			for i in range(self.array_fill - 1, -1, -1):
+				#print self.bullet_array[ARRAY_OUT_TIME]
+				if self.bullet_array[ARRAY_OUT_TIME,i] < 0:
+					self.delete_bullet(i)
+					#print("delete bullet : out bounds")
 
 
 	def _check_collisions(self):
-		num.subtract(self.bullet_array[ARRAY_UNTIL],num.ones((self.array_size),num.Float),self.bullet_array[ARRAY_UNTIL])
+		self.bullet_array[ARRAY_UNTIL] -= 1.
 		self.collision = coll.coll(self.bullet_array, self.array_fill, self.player_list, len(self.player_list))
 		self.collisionML = coll.collml(self.bullet_array_ml, self.array_ml_fill, self.player_list, len(self.player_list))
 

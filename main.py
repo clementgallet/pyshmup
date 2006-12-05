@@ -229,5 +229,8 @@ def main():
 if __name__ == '__main__':
 	try:
 		hotshot.Profile("prof").runcall(main)
+		from hotshot import stats
+		s = stats.load("prof")
+		s.sort_stats("time").print_stats()
 	except NameError:
 		main()
