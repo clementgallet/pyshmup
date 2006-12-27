@@ -52,3 +52,4 @@ class Stage1(StageLoader):
 		self.create('th.xml', -50, 100, 0, 'shot.png', 'foe.png')
 		self.create('th.xml', 50, 100, 50, 'shot.png', 'foe.png')
 		self.create('th.xml', 0, 100, 100, 'shot.png', 'foe.png')
+		self.create('th.xml', 0, 150, 150, 'shot.png', 'foe.png')

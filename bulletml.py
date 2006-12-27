@@ -451,6 +451,7 @@ class FireRef(Control):
 ## Values
 
 HEUR_VALID_FORMULA = re.compile(r'^([0-9.]|\$(rand|rank|[0-9])|\(|\)|\+|-|/|\*)*$')
+NOT_RAND_FORMULA = re.compile(r'^([0-9.]|\$(rank|[0-9])|\(|\)|\+|-|/|\*)*$')
 
 filter_definitions = [
   ( re.compile(r'\$rand'), '(random.random())' ),
@@ -483,17 +484,27 @@ class Value:
 		if not HEUR_VALID_FORMULA.match(formula):
 			l.error('Invalid formula : ' + formula)
 			formula='0'
+		
+		# If there is no rand() in the formula, we can store the value instead of eval it everytime.
+		self.static = NOT_RAND_FORMULA.match(formula)
+		
 		# Performing substitutions for future eval()uation
 		old_formula = ''
 		while formula != old_formula:
 			old_formula = formula
 			for f in formula_filters:
 				formula = f(formula)
-		self.formula=formula
+		if self.static:
+			self.formula = float(eval(formula))
+		else:
+			self.formula = formula
 
 	def eval_formula(self, cookie):
 		try:
-			return float(eval(self.formula))
+			if self.static:
+				return self.formula
+			else:
+				return float(eval(self.formula))
 		except:
 			l.error('Invalid formula, interpreted as : ' + self.formula)
 			self.formula='0'
