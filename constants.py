@@ -27,7 +27,8 @@ WIDTH = 640
 HEIGHT = 480
 
 # Screen height, in game units
-SCALE = 400 
+DEFAULT_FIELD_WIDTH = 400
+DEFAULT_FIELD_HEIGHT = 300
 
 # Out-of-screen is e.g. x > width*(1+OUT_LIMIT)
 OUT_LIMIT = 0.2 
@@ -69,14 +70,17 @@ ARRAY_ML_DIM = 7
 
 PLAYER_NUMBER = 1
 
+# In turns
 NEVER = 9999
+
+# Scrolling type (depending of relative dimensions
+#  of view and playfield)
+SCROLL_NONE = 0
+SCROLL_HORIZ = 1
+SCROLL_VERT = 2
 
 ####################
 # Derived constants
-
-# 
-UNIT_HEIGHT = (SCALE/2)
-UNIT_WIDTH = ((UNIT_HEIGHT * WIDTH) / HEIGHT)
 
 
 
@@ -103,6 +107,7 @@ KEY_RIGHT = pygame.K_l
 KEY_UP = pygame.K_i
 KEY_DOWN = pygame.K_k
 KEY_QUIT = pygame.K_ESCAPE
+KEY_STATS = pygame.K_s
 
 # Keys index
 

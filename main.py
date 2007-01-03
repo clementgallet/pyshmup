@@ -11,6 +11,7 @@ import OpenGL.GL as gl   # This SUCKS, but PyOpenGL namespaces are broken IMO
 import OpenGL.GLU as glu # Macros may save the day
 
 import context
+import player
 
 #import hotshot
 import sys
@@ -33,21 +34,16 @@ l.setLevel(logging.DEBUG)
 ############
 ## Graphics
 
-def set_perspective(width, height):
+def resize_screen(system_state, width, height):
 	global screen
 	screen = pygame.display.set_mode( (width, height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE, 24)
 	gl.glClear(gl.GL_ACCUM_BUFFER_BIT)
 
 	gl.glViewport(0, 0, width, height)
 
-	gl.glMatrixMode(gl.GL_PROJECTION)
-	gl.glLoadIdentity()
-	fov = 30
-	dist = SCALE*math.tan(math.pi/8) / math.tan(fov*math.pi/360)
-	glu.gluPerspective(fov, float(WIDTH)/HEIGHT, dist*0.5, dist*1.5)
-	gl.glMatrixMode(gl.GL_MODELVIEW)
-	gl.glLoadIdentity()
-	gl.glTranslate(0, 0, -dist)
+	system_state.screen_width = width
+	system_state.screen_height = height
+	system_state.screen_resized = True
 
 images = {}
 
@@ -97,13 +93,11 @@ def init_sdl():
 	global screen
 	screen = pygame.display.set_mode( (WIDTH,HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE )
 
-	set_perspective(WIDTH, HEIGHT)
-
 	gl.glClearAccum(0,0,0,0)
 	gl.glClear(gl.GL_ACCUM_BUFFER_BIT)
 
 	gl.glClearColor(*BACKGROUND_COLOR)
-	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE)#MINUS_SRC_ALPHA)
+	gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
 	gl.glEnable(gl.GL_BLEND)
 
 	gl.glEnable(gl.GL_TEXTURE_2D)
@@ -140,14 +134,19 @@ def get_turn_actions():
 def handle_events(system_state):
 	for ev in pygame.event.get():
 		if ev.type == pygame.VIDEORESIZE:
-			set_perspective(ev.w, ev.h)
+			resize_screen(system_state, ev.w, ev.h)
 		if ev.type == pygame.QUIT:
 			quit = True
 	keys = pygame.key.get_pressed()
+	system_state.keys = keys
 
 	# Quit
 	if keys[KEY_QUIT]:
 		system_state.quit = True
+
+	# Dump stats
+	if keys[KEY_STATS]:
+		system_state.dump_stats = True
 
 	# Inputs
 	system_state.inputs[0] = (keys[KEY_RIGHT],\
@@ -160,6 +159,8 @@ class SystemState(object):
 	def __init__(self):
 		self.inputs = [(0,0,0,0,0) for i in range(PLAYER_NUMBER)]
 		self.quit = False
+		self.dump_stats = False
+		self.screen_resized = False
 
 
 # Globals 
@@ -184,7 +185,10 @@ def main():
 	frame_loc = 0
 
 	game_context = context.GameContext()
+	game_context.set_screen_size(WIDTH, HEIGHT)
 	game_context.load_stage()
+	player.Player(game_context)
+
 	system_state = SystemState()
 	while pygame.time.get_ticks() < 50000 and not system_state.quit:
 

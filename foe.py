@@ -11,13 +11,14 @@ from bullet import SimpleBulletML
 
 
 class Foe(object):
+	x = 0
+	y = 0
+	z = 0
+	speed = 0
+	direction = 0
+
 	def __init__(self):
 		#FIXME: remove these defaults
-		self.x = UNIT_WIDTH*0
-		self.y = UNIT_HEIGHT*0.3
-		self.z = 0
-		self.direction = 0
-		self.speed = 0
 		self.to_remove = False
 		self.sprite = sprite.get_sprite( FOE_BITMAP )
 		self.bullet_sprite = sprite.get_sprite( BULLET_BITMAP )
@@ -26,6 +27,7 @@ class Foe(object):
 
 	def spawn(self,context):
 		self._context = context
+
 		context.update_list.append(self)
 		context.foe_list.append(self)
 
@@ -41,8 +43,8 @@ class Foe(object):
 
 	def update(self):
 		self.direction = self.direction % 360
-		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
-		   self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT) or self.life < 0:
+		if self.x < self._context.left_border  or self.x > self._context.right_border or \
+		   self.y < self._context.down_border or self.y > self._context.up_border or self.life < 0:
 			self.vanish()
 			return self
 		self.x += math.sin(self.direction*math.pi/180)*self.speed
@@ -85,20 +87,19 @@ class Foe(object):
 class BulletMLFoe(Foe):
 	#FIXME: refactor this and SimpleBulletML
 	def __init__(self, bulletml_behav):
-
+		super(BulletMLFoe, self).__init__()
 		self.controller = BulletMLController()
 		self.controller.game_object = self
 		self.controller.set_behavior(bulletml_behav)
 		self.wait = 0
-		super(BulletMLFoe, self).__init__()
 	
 	def spawn(self,context):
+		super(BulletMLFoe, self).spawn(context)
 		#FIXME: the first player is always aimed, ahahah !!
 		if context.player_list:
 			self.aimed_player = context.player_list[0]
 		else:
 			self.aimed_player = None
-		super(BulletMLFoe, self).spawn(context)
 
 	def update(self):
 		if self.wait > 0:

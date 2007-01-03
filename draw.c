@@ -29,7 +29,7 @@ static PyObject *draw(PyObject *self, PyObject *args)
 	for (j=0;j<card_ml;j++)
 	  {
 	    glPushMatrix();
-	    glColor4f(1.0, 1.0, 1.0, 0.2);
+	    glColor4f(1.0, 1.0, 1.0, 0.9);
 	    glTranslatef(array_ml_elem(X),array_ml_elem(Y), array_ml_elem(Z));
 	    glCallList((int) array_ml_elem(LIST));
 	    glPopMatrix();

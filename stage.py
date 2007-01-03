@@ -22,6 +22,9 @@ class StageLoader(object):
 		self._context = context
 		self.launch_list = []
 
+		# default values
+		context.set_field_size(DEFAULT_FIELD_WIDTH, DEFAULT_FIELD_HEIGHT)
+
 	def update(self):
 		"""
 		Advance the stage by a frame.
@@ -49,6 +52,7 @@ class Stage1(StageLoader):
 	
 	def __init__(self, context):
 		super(Stage1, self).__init__(context)
+		context.set_field_size(200, 400)
 		self.create('th.xml', -50, 100, 0, 'shot.png', 'foe.png')
 		self.create('th.xml', 50, 100, 50, 'shot.png', 'foe.png')
 		self.create('th.xml', 0, 100, 100, 'shot.png', 'foe.png')

@@ -14,7 +14,7 @@ class Player:
 		self._context = context
 
 		self.x = 0.0
-		self.y = -UNIT_HEIGHT * .5
+		self.y = - context._field_height * .25
 		self.frame = 0
 		self.id = len(context.player_list) # Won't work when a death occurs
 		context.update_list.append(self)

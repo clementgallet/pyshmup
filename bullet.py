@@ -86,8 +86,8 @@ class SimpleBulletML(object):
 		if self.to_remove:
 			return self
 
-		if self.x < -UNIT_WIDTH*(1+OUT_LIMIT)  or self.x > UNIT_WIDTH*(1+OUT_LIMIT) or \
-		       self.y < -UNIT_HEIGHT*(1+OUT_LIMIT) or self.y > UNIT_HEIGHT*(1+OUT_LIMIT):
+		if self.x < self._context.left_border  or self.x > self._context.right_border or \
+		       self.y < self._context.down_border or self.y > self._context.up_border:
 			self.vanish()
 
 		return self

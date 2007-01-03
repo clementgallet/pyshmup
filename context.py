@@ -1,5 +1,6 @@
 import Numeric as num
 import OpenGL.GL as gl
+import OpenGL.GLU as glu
 
 from constants import *
 import math
@@ -25,6 +26,20 @@ class GameContext(object):
 	
 	frame = 0
 
+	# set by stage
+	_field_width = None
+	_field_height = None
+
+	# set by event handler
+	_screen_width = None
+	_screen_height = None
+
+	# computed in _adjust_perspective()
+	_view_width = None
+	_view_height = None
+
+	old_dump_stats = False
+
 	def __init__(self):
 		# lower-level objects are allowed to use thoses structures directly
 		self.update_list = []
@@ -43,7 +58,6 @@ class GameContext(object):
 	
 		self.collision = 0
 		self.collisionML = 0
-		player.Player(self)
 
 		#self.tr = sprite.get_sprite(BULLET_BITMAP)
 
@@ -68,6 +82,16 @@ class GameContext(object):
 		# Share current system state with other objects
 		self._system_state = system_state
 
+		if system_state.screen_resized:
+			self.set_screen_size(system_state.screen_width, system_state.screen_height)
+			system_state.screen_resized = False
+
+		if system_state.dump_stats:
+			if not self.old_dump_stats:
+				print "stats !"
+				pprint([(s, self.__getattribute__(s)) for s in dir(self) if s.find('_list') == -1 and s.find('array') == -1])
+			self.old_dump_stats = system_state.dump_stats
+
 		# Update everything
 		self._move_bullets()
 		self._out_bounds()
@@ -86,6 +110,22 @@ class GameContext(object):
 		#print "drawing"
 		#return
 
+		camera_x = 0
+		camera_y = 0
+		if self._scroll_type == SCROLL_HORIZ:
+			try:
+				px = self.player_list[0].x
+				camera_x = px/self._field_width*(self._field_width - self._view_width)
+			except IndexError:
+				camera_x = 0
+		if self._scroll_type == SCROLL_VERT:
+			try:
+				py = self.player_list[0].y
+				camera_y = py/self._field_height*(self._field_height - self._view_height)
+			except IndexError:
+				camera_y = 0
+		gl.glPushMatrix()
+		gl.glTranslatef(-camera_x, -camera_y, 0)
 		for object in self.player_list + self.foe_list + self.shot_list:
 			object.draw()
 		#print ("nbr of normal/ml bullets : " + str(self.array_fill) + "/" + str(self.array_ml_fill))
@@ -93,9 +133,78 @@ class GameContext(object):
 #		gl.glAccum(gl.GL_MULT, 0.9)
 #		gl.glAccum(gl.GL_ACCUM, 1.0)
 #		gl.glAccum(gl.GL_RETURN, 1.0)
+		gl.glDisable(gl.GL_TEXTURE_2D)
+		gl.glColor4f(1.,1.,1.,1.)
+		gl.glBegin(gl.GL_LINE_LOOP)
+		gl.glVertex2f(-0.45*self._field_width, 0.45*self._field_height)
+		gl.glVertex2f(-0.45*self._field_width,-0.45*self._field_height)
+		gl.glVertex2f(0.45*self._field_width, -0.45*self._field_height)
+		gl.glVertex2f(0.45*self._field_width,  0.45*self._field_height)
+		gl.glEnd()
+		gl.glBegin(gl.GL_LINE_LOOP)
+		gl.glVertex2f(-0.5*self._field_width, 0.5*self._field_height)
+		gl.glVertex2f(-0.5*self._field_width,-0.5*self._field_height)
+		gl.glVertex2f(0.5*self._field_width, -0.5*self._field_height)
+		gl.glVertex2f(0.5*self._field_width,  0.5*self._field_height)
+		gl.glEnd()
+		gl.glEnable(gl.GL_TEXTURE_2D)
 		
+
 		pygame.display.flip()
 		gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+
+		gl.glPopMatrix()
+
+	def set_screen_size(self, w, h):
+		self._screen_width = w
+		self._screen_height = h
+		self._adjust_perspective()
+
+	def set_field_size(self, w, h):
+		self._field_width = w
+		self._field_height = h
+		self._adjust_perspective()
+
+		self.left_border = -(w/2.)*(1+OUT_LIMIT)
+		self.right_border = (w/2.)*(1+OUT_LIMIT)
+		self.down_border = -(h/2.)*(1+OUT_LIMIT)
+		self.up_border   =  (w/2.)*(1+OUT_LIMIT)
+
+	def _adjust_perspective(self):
+		if self._screen_width is None or self._field_width is None:
+			return
+
+		# zoom factors to fit dimensions, units.px^-1
+		zoom_x = float(self._field_width) / self._screen_width
+		zoom_y = float(self._field_height) / self._screen_height
+
+		if zoom_x > zoom_y:
+			self._scroll_type = SCROLL_HORIZ
+			zoom = zoom_y
+		elif zoom_x < zoom_y:
+			self._scroll_type = SCROLL_VERT
+			zoom = zoom_x
+		else:
+			self._scroll_type = SCROLL_NONE
+			zoom = zoom_x
+
+		# view size (in game units)
+		self._view_width = zoom*self._screen_width
+		self._view_height = zoom*self._screen_height
+
+		# setting perspective
+		gl.glMatrixMode(gl.GL_PROJECTION)
+		gl.glLoadIdentity()
+		fov = 30
+		dist = self._view_height / (2 * math.tan(fov*math.pi/360))
+		glu.gluPerspective(fov, float(self._view_width)/self._view_height, dist*0.5, dist*1.5)
+		gl.glMatrixMode(gl.GL_MODELVIEW)
+		gl.glLoadIdentity()
+		gl.glTranslate(0, 0, -dist)
+
+		
+
+
 
 	#######################################
 	# Services to lower-level game objects
@@ -108,21 +217,21 @@ class GameContext(object):
 		# (the +10 / -10 on the first line
 		# is to avoid wrapping of the modulo around 0)
 		if abs(((direction + 10)%180)-10) < 0.1 or speed == 0:
-			time_x = 10000000
+			time_x = NEVER
 		elif 0 < direction % 360 < 180:
-			time_x = (UNIT_WIDTH*(1+OUT_LIMIT) - x) / \
+			time_x = (self.right_border - x) / \
 			             (math.sin(direction*math.pi/180)*speed)
 		else:
-			time_x = (-UNIT_WIDTH*(1+OUT_LIMIT) - x) / \
+			time_x = (self.left_border - x) / \
 			             (math.sin(direction*math.pi/180)*speed)
 	
 		if abs(direction%180 - 90) < 0.1 or speed == 0:
-			time_y = 10000000
+			time_y = NEVER
 		elif 90 < direction % 360 < 270:
-			time_y = (UNIT_HEIGHT*(1+OUT_LIMIT) - y) / \
+			time_y = (self.right_border - y) / \
 			             (-math.cos(direction*math.pi/180)*speed)
 		else:
-			time_y = (-UNIT_HEIGHT*(1+OUT_LIMIT) - y) / \
+			time_y = (self.left_border - y) / \
 			             (-math.cos(direction*math.pi/180)*speed)
 	
 		out_time = min(time_x,time_y)
