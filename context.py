@@ -40,6 +40,9 @@ class GameContext(object):
 
 	old_dump_stats = False
 
+	use_horizontal_scroll = True
+	use_vertical_scroll = False
+
 	def __init__(self):
 		# lower-level objects are allowed to use thoses structures directly
 		self.update_list = []
@@ -134,6 +137,7 @@ class GameContext(object):
 #		gl.glAccum(gl.GL_ACCUM, 1.0)
 #		gl.glAccum(gl.GL_RETURN, 1.0)
 		gl.glDisable(gl.GL_TEXTURE_2D)
+		gl.glLineWidth(3.)
 		gl.glColor4f(1.,1.,1.,1.)
 		gl.glBegin(gl.GL_LINE_LOOP)
 		gl.glVertex2f(-0.45*self._field_width, 0.45*self._field_height)
@@ -148,6 +152,7 @@ class GameContext(object):
 		gl.glVertex2f(0.5*self._field_width,  0.5*self._field_height)
 		gl.glEnd()
 		gl.glEnable(gl.GL_TEXTURE_2D)
+		gl.glLineWidth(1.)
 		
 
 		pygame.display.flip()
@@ -178,19 +183,39 @@ class GameContext(object):
 		zoom_x = float(self._field_width) / self._screen_width
 		zoom_y = float(self._field_height) / self._screen_height
 
+		# GL viewport, not game view
+		#  can change in the lines below
+		viewport_width = self._screen_width
+		viewport_height = self._screen_height
+
 		if zoom_x > zoom_y:
-			self._scroll_type = SCROLL_HORIZ
-			zoom = zoom_y
+			if self.use_horizontal_scroll:
+				self._scroll_type = SCROLL_HORIZ
+				zoom = zoom_y
+			else:
+				self._scroll_type = SCROLL_NONE
+				zoom = zoom_x
+				viewport_height = (zoom_y/zoom_x)*self._screen_height
 		elif zoom_x < zoom_y:
-			self._scroll_type = SCROLL_VERT
-			zoom = zoom_x
+			if self.use_vertical_scroll:
+				self._scroll_type = SCROLL_VERT
+				zoom = zoom_x
+			else:
+				self._scroll_type = SCROLL_NONE
+				zoom = zoom_y
+				viewport_width = (zoom_x/zoom_y)*self._screen_width
 		else:
 			self._scroll_type = SCROLL_NONE
 			zoom = zoom_x
 
 		# view size (in game units)
-		self._view_width = zoom*self._screen_width
-		self._view_height = zoom*self._screen_height
+		self._view_width = zoom*viewport_width
+		self._view_height = zoom*viewport_height
+
+		gl.glViewport( int((self._screen_width-viewport_width)/2),
+		               int((self._screen_height-viewport_height)/2),
+		               int(viewport_width),
+		               int(viewport_height))
 
 		# setting perspective
 		gl.glMatrixMode(gl.GL_PROJECTION)

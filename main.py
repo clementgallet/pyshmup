@@ -39,7 +39,7 @@ def resize_screen(system_state, width, height):
 	screen = pygame.display.set_mode( (width, height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE, 24)
 	gl.glClear(gl.GL_ACCUM_BUFFER_BIT)
 
-	gl.glViewport(0, 0, width, height)
+	gl.glViewport(0, 0, width, height) #FIXME: remove this
 
 	system_state.screen_width = width
 	system_state.screen_height = height
