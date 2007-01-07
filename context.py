@@ -253,10 +253,10 @@ class GameContext(object):
 		if abs(direction%180 - 90) < 0.1 or speed == 0:
 			time_y = NEVER
 		elif 90 < direction % 360 < 270:
-			time_y = (self.right_border - y) / \
+			time_y = (self.up_border - y) / \
 			             (-math.cos(direction*math.pi/180)*speed)
 		else:
-			time_y = (self.left_border - y) / \
+			time_y = (self.down_border - y) / \
 			             (-math.cos(direction*math.pi/180)*speed)
 	
 		out_time = min(time_x,time_y)
