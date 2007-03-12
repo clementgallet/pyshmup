@@ -5,6 +5,7 @@ from constants import *
 
 from foe import BulletMLFoe
 import sprite
+import text
 
 l = logging.getLogger('stage')
 l.setLevel(logging.DEBUG)
@@ -47,6 +48,7 @@ class StageLoader(object):
 		foe.frame = frame
 		self.launch_list.append(foe)
 
+import fonts
 
 class Stage1(StageLoader):
 	
@@ -57,3 +59,4 @@ class Stage1(StageLoader):
 		self.create('th.xml', 50, 100, 50, 'shot.png', 'foe.png')
 		self.create('th.xml', 0, 100, 100, 'shot.png', 'foe.png')
 		self.create('th.xml', 0, 150, 150, 'shot.png', 'foe.png')
+		self.launch_list.append(text.StaticText('foobar', 0, 0, 20))

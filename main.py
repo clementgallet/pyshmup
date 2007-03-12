@@ -12,6 +12,7 @@ import OpenGL.GLU as glu # Macros may save the day
 
 import context
 import player
+import fonts
 
 #import hotshot
 import sys
@@ -176,6 +177,7 @@ def main():
 	global first_ticks
 	
 	init_sdl()
+	fonts.init()
 	
 	# For statistics
 	frame = 0

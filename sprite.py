@@ -2,6 +2,8 @@ import logging
 import pygame
 from OpenGL.GL import *
 
+import tex
+
 ###########
 ## Logging
 
@@ -37,33 +39,11 @@ def get_sprite(filename):
 		sprites[filename] = get_sprite(NULL_IMAGE_PATH)
 		return sprites[filename]
 
-	width = im.get_width()
-	k_width = 1
-	while k_width < width:
-		k_width *= 2
-
-	height = im.get_height()
-	k_height = 1
-	while k_height < height:
-		k_height *= 2
-
-	s = pygame.Surface((k_width, k_height), pygame.SRCALPHA, im)
-	s.blit(im, (0,k_height-height))
-
-	data = pygame.image.tostring(s, "RGBA", True)
-
-	bytes = [str(ord(x)) for x in list(data)]
-	blocs = [bytes[4*k:4*k+4] for k in xrange(len(bytes)/4)]
-
-	textures[filename] = glGenTextures(1)
+	textures[filename], tw, th = tex.make_texture(im)
 	l.info("Loaded texture : %s" % filename)
 
-	glBindTexture(GL_TEXTURE_2D, textures[filename])
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, k_width, 
-	        k_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data)
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+	width = im.get_width()
+	height = im.get_height()
 
 	#FIXME: get origin coords
 	x = im.get_width()/2
@@ -75,8 +55,8 @@ def get_sprite(filename):
 
 	sprites[filename] = SimpleSprite(tex_id = textures[filename], orig_x = x, \
 	            orig_y = y, spr_w = width, spr_h = height, \
-					tex_w = float(width)/k_width, \
-					tex_h = float(height)/k_height)
+					tex_w = float(width)/tw, \
+					tex_h = float(height)/th)
 	
 	return sprites[filename]
 

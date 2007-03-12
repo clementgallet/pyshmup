@@ -50,6 +50,7 @@ class GameContext(object):
 		self.player_list = []
 		self.foe_list = []
 		self.shot_list = []
+		self.others_list = []
 
 		self.array_size = 8
 		self.bullet_array = num.zeros((ARRAY_DIM, self.array_size), num.Float)
@@ -129,7 +130,7 @@ class GameContext(object):
 				camera_y = 0
 		gl.glPushMatrix()
 		gl.glTranslatef(-camera_x, -camera_y, 0)
-		for object in self.player_list + self.foe_list + self.shot_list:
+		for object in self.player_list + self.foe_list + self.shot_list + self.others_list:
 			object.draw()
 		#print ("nbr of normal/ml bullets : " + str(self.array_fill) + "/" + str(self.array_ml_fill))
 		draw.draw(self.bullet_array, self.array_fill,self.bullet_array_ml, self.array_ml_fill)
