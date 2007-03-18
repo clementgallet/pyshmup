@@ -174,7 +174,7 @@ class GameContext(object):
 		self.left_border = -(w/2.)*(1+OUT_LIMIT)
 		self.right_border = (w/2.)*(1+OUT_LIMIT)
 		self.down_border = -(h/2.)*(1+OUT_LIMIT)
-		self.up_border   =  (w/2.)*(1+OUT_LIMIT)
+		self.up_border   =  (h/2.)*(1+OUT_LIMIT)
 
 	def _adjust_perspective(self):
 		if self._screen_width is None or self._field_width is None:
