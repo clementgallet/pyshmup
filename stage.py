@@ -48,15 +48,17 @@ class StageLoader(object):
 		foe.frame = frame
 		self.launch_list.append(foe)
 
-import fonts
-
 class Stage1(StageLoader):
 	
 	def __init__(self, context):
 		super(Stage1, self).__init__(context)
 		context.set_field_size(200, 400)
 		self.create('th.xml', -50, 100, 0, 'shot.png', 'foe.png')
+		self.launch_list.append(text.MovingText('(not so) static text', -80, -30, 20))
 		self.create('th.xml', 50, 100, 50, 'shot.png', 'foe.png')
 		self.create('th.xml', 0, 100, 100, 'shot.png', 'foe.png')
 		self.create('th.xml', 0, 150, 150, 'shot.png', 'foe.png')
-		self.launch_list.append(text.StaticText('foobar', 0, 0, 20))
+		self.launch_list.append(text.MovingText('100', -80, 25, 150))
+		self.launch_list.append(text.MovingText('200', -40, 10, 180))
+		self.launch_list.append(text.MovingText('400', -60, 0, 210))
+		
