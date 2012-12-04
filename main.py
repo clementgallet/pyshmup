@@ -37,7 +37,7 @@ l.setLevel(logging.DEBUG)
 
 def resize_screen(system_state, width, height):
 	global screen
-	screen = pygame.display.set_mode( (width, height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE, 24)
+	screen = pygame.display.set_mode( (width, height), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE, 16)
 	gl.glClear(gl.GL_ACCUM_BUFFER_BIT)
 
 	gl.glViewport(0, 0, width, height) #FIXME: remove this
@@ -92,7 +92,7 @@ def init_sdl():
 
 
 	global screen
-	screen = pygame.display.set_mode( (WIDTH,HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE )
+	screen = pygame.display.set_mode( (WIDTH,HEIGHT), pygame.OPENGL | pygame.DOUBLEBUF | pygame.RESIZABLE, 16 )
 
 	gl.glClearAccum(0,0,0,0)
 	gl.glClear(gl.GL_ACCUM_BUFFER_BIT)

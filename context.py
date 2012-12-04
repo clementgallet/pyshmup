@@ -1,4 +1,4 @@
-import Numeric as num
+from numpy import *
 import OpenGL.GL as gl
 import OpenGL.GLU as glu
 
@@ -53,11 +53,11 @@ class GameContext(object):
 		self.others_list = []
 
 		self.array_size = 8
-		self.bullet_array = num.zeros((ARRAY_DIM, self.array_size), num.Float)
+		self.bullet_array = zeros((ARRAY_DIM, self.array_size), dtype=float_)
 		self.array_fill = 0
 
 		self.array_ml_size = 8
-		self.bullet_array_ml = num.zeros((ARRAY_ML_DIM, self.array_ml_size), num.Float)
+		self.bullet_array_ml = zeros((ARRAY_ML_DIM, self.array_ml_size), dtype=float_)
 		self.array_ml_fill = 0
 	
 		self.collision = 0
@@ -272,13 +272,13 @@ class GameContext(object):
 #		bullet_array[ARRAY_OUT_TIME][index] = out_time
 #		bullet_array[ARRAY_COLLIDE_MASK][index] = 0
 		#print("x : " + str(x) +  ", y : " + str(y))
-		self.bullet_array[:,self.array_fill] = (x,y,z,direction,speed,display_list,0,out_time,0)
+		self.bullet_array[:,self.array_fill] = array([x,y,z,direction,speed,display_list,0,out_time,0])
 	
 		self.array_fill += 1
 
 		# Grow array
 		if self.array_fill == self.array_size:
-			new_array = num.zeros((ARRAY_DIM,2*self.array_size),num.Float)
+			new_array = zeros((ARRAY_DIM,2*self.array_size), dtype=float_)
 			new_array[:,:self.array_size] = self.bullet_array
 			self.bullet_array = new_array
 			self.array_size *= 2
@@ -294,13 +294,13 @@ class GameContext(object):
 #		bullet_array_ml[ARRAY_ML_SPEED][index] = speed
 #		bullet_array_ml[ARRAY_ML_LIST][index] = display_list
 #		bullet_array_ml[ARRAY_ML_COLLIDE_MASK][index] = 0
-		self.bullet_array_ml[:,self.array_ml_fill] = (x,y,z,direction,speed,display_list,0)
+		self.bullet_array_ml[:,self.array_ml_fill] = array([x,y,z,direction,speed,display_list,0])
 		self.array_ml_fill += 1
 #		print("add bullet : #" + str(self.array_ml_fill))
 
 		# Grow array
 		if self.array_ml_fill == self.array_ml_size:
-			new_array = num.zeros((ARRAY_ML_DIM,2*self.array_ml_size),num.Float)
+			new_array = zeros((ARRAY_ML_DIM,2*self.array_ml_size),dtype=float_)
 			new_array[:,:self.array_ml_size] = self.bullet_array_ml
 			self.bullet_array_ml = new_array
 			self.array_ml_size *= 2
@@ -338,45 +338,13 @@ class GameContext(object):
 	# Internal methods
 
 	def _move_bullets(self):
-		num.add( \
-		  self.bullet_array[ARRAY_X], \
-		  num.multiply( \
-		    num.sin( \
-		      num.multiply( \
-		        self.bullet_array[ARRAY_DIRECTION], \
-		        math.pi/180)), \
-		    self.bullet_array[ARRAY_SPEED]), \
-		  self.bullet_array[ARRAY_X])
+		self.bullet_array[ARRAY_X] += sin(self.bullet_array[ARRAY_DIRECTION] * math.pi/180) * self.bullet_array[ARRAY_SPEED]
 		
-		num.subtract( \
-		  self.bullet_array[ARRAY_Y], \
-		  num.multiply( \
-		    num.cos( \
-		      num.multiply( \
-		        self.bullet_array[ARRAY_DIRECTION], \
-		        math.pi/180)), \
-		    self.bullet_array[ARRAY_SPEED]), \
-		  self.bullet_array[ARRAY_Y]) 
+		self.bullet_array[ARRAY_Y] -= cos(self.bullet_array[ARRAY_DIRECTION] * math.pi/180) * self.bullet_array[ARRAY_SPEED]
 
-		num.add( \
-		  self.bullet_array_ml[ARRAY_ML_X], \
-		  num.multiply( \
-		    num.sin( \
-		      num.multiply( \
-		        self.bullet_array_ml[ARRAY_ML_DIRECTION], \
-		        math.pi/180)), \
-		    self.bullet_array_ml[ARRAY_ML_SPEED]), \
-		  self.bullet_array_ml[ARRAY_ML_X])
+		self.bullet_array_ml[ARRAY_ML_X] += sin(self.bullet_array_ml[ARRAY_ML_DIRECTION] * math.pi/180) * self.bullet_array_ml[ARRAY_ML_SPEED]
 		
-		num.subtract( \
-		  self.bullet_array_ml[ARRAY_ML_Y], \
-		  num.multiply( \
-		    num.cos( \
-		      num.multiply( \
-		        self.bullet_array_ml[ARRAY_ML_DIRECTION], \
-		        math.pi/180)), \
-		    self.bullet_array_ml[ARRAY_ML_SPEED]), \
-		  self.bullet_array_ml[ARRAY_ML_Y]) 
+		self.bullet_array_ml[ARRAY_ML_Y] -= cos(self.bullet_array_ml[ARRAY_ML_DIRECTION] * math.pi/180) * self.bullet_array_ml[ARRAY_ML_SPEED]
 
 	def _out_bounds(self):
 		self.bullet_array[ARRAY_OUT_TIME] -= 1.
