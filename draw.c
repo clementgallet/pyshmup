@@ -1,5 +1,5 @@
 #include <Python.h>
-#include <Numeric/arrayobject.h>
+#include <numpy/arrayobject.h>
 #include <GL/gl.h>
 #include "constants.h"
 #include "stdio.h"
